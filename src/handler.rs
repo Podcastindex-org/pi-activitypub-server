@@ -47,6 +47,13 @@ struct PublicKey {
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
+struct Icon {
+    r#type: String,
+    url: String,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize)]
 struct Actor {
     #[serde(rename="@context")]
     context: Vec<String>,
@@ -54,6 +61,7 @@ struct Actor {
     r#type: String,
     preferredUsername: String,
     inbox: String,
+    icon: Icon,
     publicKey: PublicKey,
 }
 
@@ -153,6 +161,9 @@ pub async fn webfinger(ctx: Context) -> Response {
         }
     }
 
+    //Determine image type
+
+
     //Construct a response
     let webfinger_data = Webfinger {
         subject: format!("acct:{}@ap.podcastindex.org", podcast_guid).to_string(),
@@ -174,7 +185,7 @@ pub async fn webfinger(ctx: Context) -> Response {
             },
             Link {
                 rel: "http://webfinger.net/rel/avatar".to_string(),
-                r#type: Some("image/jpeg".to_string()),
+                r#type: Some("image/png".to_string()),
                 href: Some(format!("{}", podcast_data.feed.image).to_string()),
                 template: None,
             },
@@ -276,6 +287,10 @@ pub async fn actor(ctx: Context) -> Response {
         r#type: "Person".to_string(),
         preferredUsername: podcast_guid.clone(),
         inbox: format!("https://ap.podcastindex.org/podcasts?id={}&resource=inbox", podcast_guid).to_string(),
+        icon: Icon {
+            r#type: "Image".to_string(),
+            url: format!("{}", podcast_data.feed.image).to_string(),
+        },
         publicKey: PublicKey {
             id: format!("https://ap.podcastindex.org/podcasts?id={}#main-key", podcast_guid).to_string(),
             owner: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
