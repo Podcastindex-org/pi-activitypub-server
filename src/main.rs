@@ -59,8 +59,9 @@ async fn main() {
     let some_state = "state".to_string();
 
     let mut router: Router = Router::new();
-    router.get("/podcasts", Box::new(handler::actor));
-    router.get("/.well-known/webfinger", Box::new(handler::webfinger));
+    router.get("/profiles", Box::new(handler::profiles)); //User profile html page
+    router.get("/podcasts", Box::new(handler::podcasts)); //JSON activity page
+    router.get("/.well-known/webfinger", Box::new(handler::webfinger)); //Webfinger
 
     let shared_router = Arc::new(router);
     let new_service = make_service_fn(move |conn: &AddrStream| {

@@ -14,6 +14,7 @@ use reqwest::header;
 
 
 //Globals ----------------------------------------------------------------------------------------------------
+//TODO: These secrets need to be moved into the environment
 const API_KEY: &str = "B899NK69ERMRE2M6HD3B";
 const API_SECRET: &str = "J3v9m$4b6NCD9ENV4QEKYb^DnWdcGR$^Gq7#5uwS";
 const AP_PUBKEY: &str = "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArYGPVCRtdZXQLAYANU6R\nhH5e5bPQ8ImW7AxOkFRIoAhK0+zJOHsn6UIrpdXK7JcIdkR3pPEG620BVHUkZOVC\nYUsnW7gNWAPyeXMVUPO0h2okCyUIeOSoRuIto8AfsfaQOeLeCIt0bqHymX4FueRi\n6y3fpUlGkNMLJ6T1tfLXElwcNxNnzEV4dvCpwHh9lZwQKersbKFgpVFl5VO9+ZG+\nhO2ym6KMGeD09oPK7lvvhjItfEkqmzOVCkH4PRXaHwcst9lBNwSNKeUkNWfIg8Bd\nqFFCZMx6+VmwBeaFIa8ia9jMT2ofTZ56Whlx7Jo9j7wtTGNeo/HC0v4Uvkbw+o+v\nfQIDAQAB\n-----END PUBLIC KEY-----";
@@ -174,7 +175,7 @@ pub async fn webfinger(ctx: Context) -> Response {
             Link {
                 rel: "http://webfinger.net/rel/profile-page".to_string(),
                 r#type: Some("text/html".to_string()),
-                href: Some(format!("https://podcastindex.org/podcast/{}", podcast_guid).to_string()),
+                href: Some(format!("https://ap.podcastindex.org/profiles?id={}", podcast_guid).to_string()),
                 template: None,
             },
             Link {
@@ -220,14 +221,15 @@ pub async fn webfinger(ctx: Context) -> Response {
 
 }
 
-pub async fn actor(ctx: Context) -> Response {
+pub async fn podcasts(ctx: Context) -> Response {
+    let mut ctype = 0;
 
     //Get query parameters
     let params: HashMap<String, String> = ctx.req.uri().query().map(|v| {
         url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
     }).unwrap_or_else(HashMap::new);
 
-    println!("{:#?}", params);
+    println!("{:#?}", ctx);
 
     //Make sure a session param was given
     let guid;
@@ -316,6 +318,112 @@ pub async fn actor(ctx: Context) -> Response {
         .status(StatusCode::OK)
         .header("Content-type", "application/activity+json; charset=utf-8")
         .body(format!("{}", actor_json).into())
+        .unwrap();
+
+}
+
+pub async fn profiles(ctx: Context) -> Response {
+    let mut ctype = 0;
+
+    //Get query parameters
+    let params: HashMap<String, String> = ctx.req.uri().query().map(|v| {
+        url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
+    }).unwrap_or_else(HashMap::new);
+
+    println!("{:#?}", ctx);
+
+    //Make sure a session param was given
+    let guid;
+    match params.get("id") {
+        Some(resource) => {
+            println!("Got a resource: {}\n", resource);
+            let parts = resource.replace("acct:", "");
+            guid = parts.split("@").next().unwrap().to_string();
+        }
+        None => {
+            println!("Invalid resource.\n");
+            return hyper::Response::builder()
+                .status(StatusCode::from_u16(400).unwrap())
+                .body(format!("No resource given.").into())
+                .unwrap();
+        }
+    }
+
+    let podcast_guid = guid.clone();
+
+    //Lookup API of podcast
+    let podcast_data: PIPodcast;
+    let api_response = api_get_podcast(API_KEY, API_SECRET, &podcast_guid).await;
+    match api_response {
+        Ok(response_body) => {
+            //eprintln!("{:#?}", response_body);
+            match serde_json::from_str(response_body.as_str()) {
+                Ok(data) => {
+                    podcast_data = data;
+                    println!("{}", podcast_data.feed.image);
+                }
+                Err(e) => {
+                    println!("Response prep error: [{:#?}].\n", e);
+                    return hyper::Response::builder()
+                        .status(StatusCode::from_u16(501).unwrap())
+                        .body(format!("Response prep error.").into())
+                        .unwrap();
+                }
+            }
+        }
+        Err(e) => {
+            println!("Response prep error: [{:#?}].\n", e);
+            return hyper::Response::builder()
+                .status(StatusCode::from_u16(501).unwrap())
+                .body(format!("Response prep error.").into())
+                .unwrap();
+        }
+    }
+
+    //Build HTML profile page
+    let profile_page_template = "<!DOCTYPE html>
+<html lang='en'>
+  <head>
+    <meta charset='utf-8' />
+    <meta content='{}' property='og:title' />
+    <meta content='{}' property='og:url' />
+    <meta content='{}' property='og:description' />
+    <meta content='article' property='og:type' />
+    <meta content='{}' property='og:image' />
+    <meta content='150' property='og:image:width' />
+    <meta content='150' property='og:image:height' />
+  </head>
+  <body>
+    Empty
+  </body>
+  </html>";
+
+    return hyper::Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-type", "text/html")
+        .body(
+            format!("<!DOCTYPE html>
+<html lang='en'>
+  <head>
+    <meta charset='utf-8' />
+    <meta content='{}' property='og:title' />
+    <meta content='{}' property='og:url' />
+    <meta content='{}' property='og:description' />
+    <meta content='article' property='og:type' />
+    <meta content='{}' property='og:image' />
+    <meta content='150' property='og:image:width' />
+    <meta content='150' property='og:image:height' />
+  </head>
+  <body>
+    Empty
+  </body>
+  </html>",
+                podcast_data.feed.title,
+                format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
+                podcast_data.feed.description,
+                podcast_data.feed.image
+            ).into()
+        )
         .unwrap();
 
 }
