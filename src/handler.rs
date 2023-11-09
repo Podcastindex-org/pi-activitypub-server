@@ -155,7 +155,7 @@ pub async fn webfinger(ctx: Context) -> Response {
 
     //Construct a response
     let webfinger_data = Webfinger {
-        subject: format!("acct:{}@podcastindex.org", podcast_guid).to_string(),
+        subject: format!("acct:{}@ap.podcastindex.org", podcast_guid).to_string(),
         aliases: vec!(
             format!("https://podcastindex.org/podcast/{}", podcast_guid).to_string()
         ),
