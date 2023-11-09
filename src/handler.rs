@@ -10,7 +10,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use sha1::{Sha1, Digest};
 use urlencoding;
 use reqwest::header;
-use chrono::{TimeZone,Utc,DateTime};
+use chrono::{TimeZone,Utc};
 
 
 
@@ -206,13 +206,13 @@ pub async fn webfinger(ctx: Context) -> Response {
         url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
     }).unwrap_or_else(HashMap::new);
 
-    //println!("{:#?}", params);
+    println!("Request: {} from: {:#?}", ctx.req.uri(), ctx.req.headers().get("user-agent"));
 
     //Make sure a session param was given
     let guid;
     match params.get("resource") {
         Some(resource) => {
-            println!("Got a resource: {}\n", resource);
+            println!("  Resource: {}\n", resource);
             let parts = resource.replace("acct:", "");
             guid = parts.split("@").next().unwrap().to_string();
         }
@@ -322,13 +322,13 @@ pub async fn podcasts(ctx: Context) -> Response {
         url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
     }).unwrap_or_else(HashMap::new);
 
-    //println!("{:#?}", ctx);
+    println!("Request: {} from: {:#?}", ctx.req.uri(), ctx.req.headers().get("user-agent"));
 
     //Make sure a session param was given
     let guid;
     match params.get("id") {
         Some(resource) => {
-            println!("Got a resource: {}\n", resource);
+            println!("  Id: {}\n", resource);
             let parts = resource.replace("acct:", "");
             guid = parts.split("@").next().unwrap().to_string();
         }
@@ -453,13 +453,13 @@ pub async fn profiles(ctx: Context) -> Response {
         url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
     }).unwrap_or_else(HashMap::new);
 
-    //println!("{:#?}", ctx);
+    println!("Request: {} from: {:#?}", ctx.req.uri(), ctx.req.headers().get("user-agent"));
 
     //Make sure a session param was given
     let guid;
     match params.get("id") {
         Some(resource) => {
-            println!("Got a resource: {}\n", resource);
+            println!("  Id: {}\n", resource);
             let parts = resource.replace("acct:", "");
             guid = parts.split("@").next().unwrap().to_string();
         }
@@ -541,13 +541,13 @@ pub async fn outbox(ctx: Context) -> Response {
         url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
     }).unwrap_or_else(HashMap::new);
 
-    //println!("{:#?}", ctx);
+    println!("Request: {} from: {:#?}", ctx.req.uri(), ctx.req.headers().get("user-agent"));
 
     //Make sure a session param was given
     let guid;
     match params.get("id") {
         Some(resource) => {
-            println!("Got a resource: {}\n", resource);
+            println!("  Id: {}\n", resource);
             let parts = resource.replace("acct:", "");
             guid = parts.split("@").next().unwrap().to_string();
         }
@@ -716,7 +716,7 @@ pub async fn outbox(ctx: Context) -> Response {
 
 //API calls --------------------------------------------------------------------------------------------------
 pub async fn api_get_podcast(key: &'static str, secret: &'static str, query: &str) -> Result<String, Box<dyn Error>> {
-    println!("Running...");
+    println!("PI API Request: /podcasts/byfeedid");
 
     let api_key = key;
     let api_secret = secret;
@@ -765,7 +765,7 @@ pub async fn api_get_podcast(key: &'static str, secret: &'static str, query: &st
 }
 
 pub async fn api_get_episodes(key: &'static str, secret: &'static str, query: &str) -> Result<String, Box<dyn Error>> {
-    println!("Running...");
+    println!("  PI API Request: /episodes/byfeedid");
 
     let api_key = key;
     let api_secret = secret;
