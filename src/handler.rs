@@ -55,6 +55,14 @@ struct Icon {
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
+struct Attachment {
+    name: String,
+    r#type: String,
+    value: String,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize)]
 struct Actor {
     #[serde(rename="@context")]
     context: Vec<String>,
@@ -63,6 +71,9 @@ struct Actor {
     preferredUsername: String,
     inbox: String,
     icon: Icon,
+    summary: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    attachment: Option<Vec<Attachment>>,
     publicKey: PublicKey,
 }
 
@@ -222,7 +233,6 @@ pub async fn webfinger(ctx: Context) -> Response {
 }
 
 pub async fn podcasts(ctx: Context) -> Response {
-    let mut ctype = 0;
 
     //Get query parameters
     let params: HashMap<String, String> = ctx.req.uri().query().map(|v| {
@@ -293,6 +303,35 @@ pub async fn podcasts(ctx: Context) -> Response {
             r#type: "Image".to_string(),
             url: format!("{}", podcast_data.feed.image).to_string(),
         },
+        summary: format!("{:.96}", podcast_data.feed.description),
+        attachment: Some(vec!(
+            Attachment {
+                name: "Index".to_string(),
+                r#type: "PropertyValue".to_string(),
+                value: format!(
+                    "<a href='https://podcastindex.org/podcast/{}' rel='ugc'>https://podcastindex.org/podcast/{}</a>",
+                    podcast_guid,
+                    podcast_guid,
+                ).to_string(),
+            },
+            Attachment {
+                name: "Website".to_string(),
+                r#type: "PropertyValue".to_string(),
+                value: format!(
+                    "<a href='{}' rel='ugc'>{}</a>",
+                    podcast_data.feed.link,
+                    podcast_data.feed.link,
+                ).to_string(),
+            },
+            Attachment {
+                name: "Podcast Guid".to_string(),
+                r#type: "PropertyValue".to_string(),
+                value: format!(
+                    "{}",
+                    podcast_data.feed.podcastGuid,
+                ).to_string(),
+            },
+        )),
         publicKey: PublicKey {
             id: format!("https://ap.podcastindex.org/podcasts?id={}#main-key", podcast_guid).to_string(),
             owner: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
@@ -323,7 +362,6 @@ pub async fn podcasts(ctx: Context) -> Response {
 }
 
 pub async fn profiles(ctx: Context) -> Response {
-    let mut ctype = 0;
 
     //Get query parameters
     let params: HashMap<String, String> = ctx.req.uri().query().map(|v| {
@@ -381,23 +419,6 @@ pub async fn profiles(ctx: Context) -> Response {
     }
 
     //Build HTML profile page
-    let profile_page_template = "<!DOCTYPE html>
-<html lang='en'>
-  <head>
-    <meta charset='utf-8' />
-    <meta content='{}' property='og:title' />
-    <meta content='{}' property='og:url' />
-    <meta content='{}' property='og:description' />
-    <meta content='article' property='og:type' />
-    <meta content='{}' property='og:image' />
-    <meta content='150' property='og:image:width' />
-    <meta content='150' property='og:image:height' />
-  </head>
-  <body>
-    Empty
-  </body>
-  </html>";
-
     return hyper::Response::builder()
         .status(StatusCode::OK)
         .header("Content-type", "text/html")
