@@ -69,6 +69,7 @@ struct Actor {
     id: String,
     r#type: String,
     preferredUsername: String,
+    name: String,
     inbox: String,
     icon: Icon,
     summary: String,
@@ -298,6 +299,7 @@ pub async fn podcasts(ctx: Context) -> Response {
         id: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
         r#type: "Person".to_string(),
         preferredUsername: podcast_guid.clone(),
+        name: format!("{:.48}", podcast_data.feed.title).to_string(),
         inbox: format!("https://ap.podcastindex.org/podcasts?id={}&resource=inbox", podcast_guid).to_string(),
         icon: Icon {
             r#type: "Image".to_string(),
