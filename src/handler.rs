@@ -10,6 +10,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use sha1::{Sha1, Digest};
 use urlencoding;
 use reqwest::header;
+use chrono::{TimeZone,Utc,DateTime};
 
 
 
@@ -71,11 +72,68 @@ struct Actor {
     preferredUsername: String,
     name: String,
     inbox: String,
+    outbox: String,
     icon: Icon,
     summary: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     attachment: Option<Vec<Attachment>>,
     publicKey: PublicKey,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize)]
+struct OutboxConfig {
+    #[serde(rename="@context")]
+    context: String,
+    id: String,
+    r#type: String,
+    totalItems: u64,
+    first: String,
+    last: String,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize)]
+struct Object {
+    id: String,
+    r#type: String,
+    summary: Option<String>,
+    inReplyTo: Option<String>,
+    published: String,
+    url: String,
+    attributedTo: String,
+    to: Vec<String>,
+    cc: Option<Vec<String>>,
+    sensitive: bool,
+    conversation: String,
+    content: String,
+    attachment: Vec<String>,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize)]
+struct Item {
+    id: String,
+    r#type: String,
+    actor: String,
+    published: String,
+    directMessage: bool,
+    to: Vec<String>,
+    object: Object,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize)]
+struct OutboxPaged {
+    #[serde(rename="@context")]
+    context: String,
+    id: String,
+    r#type: String,
+    next: String,
+    prev: String,
+    partOf: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    orderedItems: Option<Vec<Item>>,
 }
 
 #[allow(non_snake_case)]
@@ -94,7 +152,6 @@ struct PIFeed {
     image: String,
     artwork: String,
     episodeCount: u64,
-
 }
 
 #[allow(non_snake_case)]
@@ -102,6 +159,31 @@ struct PIFeed {
 struct PIPodcast {
     status: String,
     feed: PIFeed
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize)]
+struct PIItem {
+    id: u64,
+    title: String,
+    link: String,
+    description: String,
+    guid: String,
+    datePublished: u64,
+    datePublishedPretty: String,
+    enclosureUrl: String,
+    enclosureType: String,
+    duration: u64,
+    image: String,
+    feedImage: String,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize)]
+struct PIEpisodes {
+    status: String,
+    items: Vec<PIItem>,
+    count: u64,
 }
 
 #[derive(Debug)]
@@ -124,7 +206,7 @@ pub async fn webfinger(ctx: Context) -> Response {
         url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
     }).unwrap_or_else(HashMap::new);
 
-    println!("{:#?}", params);
+    //println!("{:#?}", params);
 
     //Make sure a session param was given
     let guid;
@@ -240,7 +322,7 @@ pub async fn podcasts(ctx: Context) -> Response {
         url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
     }).unwrap_or_else(HashMap::new);
 
-    println!("{:#?}", ctx);
+    //println!("{:#?}", ctx);
 
     //Make sure a session param was given
     let guid;
@@ -300,7 +382,8 @@ pub async fn podcasts(ctx: Context) -> Response {
         r#type: "Person".to_string(),
         preferredUsername: podcast_guid.clone(),
         name: format!("{:.48}", podcast_data.feed.title).to_string(),
-        inbox: format!("https://ap.podcastindex.org/podcasts?id={}&resource=inbox", podcast_guid).to_string(),
+        inbox: format!("https://ap.podcastindex.org/inbox?id={}", podcast_guid).to_string(),
+        outbox: format!("https://ap.podcastindex.org/outbox?id={}", podcast_guid).to_string(),
         icon: Icon {
             r#type: "Image".to_string(),
             url: format!("{}", podcast_data.feed.image).to_string(),
@@ -370,7 +453,7 @@ pub async fn profiles(ctx: Context) -> Response {
         url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
     }).unwrap_or_else(HashMap::new);
 
-    println!("{:#?}", ctx);
+    //println!("{:#?}", ctx);
 
     //Make sure a session param was given
     let guid;
@@ -451,6 +534,187 @@ pub async fn profiles(ctx: Context) -> Response {
 
 }
 
+pub async fn outbox(ctx: Context) -> Response {
+
+    //Get query parameters
+    let params: HashMap<String, String> = ctx.req.uri().query().map(|v| {
+        url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
+    }).unwrap_or_else(HashMap::new);
+
+    //println!("{:#?}", ctx);
+
+    //Make sure a session param was given
+    let guid;
+    match params.get("id") {
+        Some(resource) => {
+            println!("Got a resource: {}\n", resource);
+            let parts = resource.replace("acct:", "");
+            guid = parts.split("@").next().unwrap().to_string();
+        }
+        None => {
+            println!("Invalid resource.\n");
+            return hyper::Response::builder()
+                .status(StatusCode::from_u16(400).unwrap())
+                .body(format!("No resource given.").into())
+                .unwrap();
+        }
+    }
+    let podcast_guid = guid.clone();
+
+    let mut paging = false;
+    match params.get("page") {
+        Some(page) => {
+            println!("Got a page value: {}\n", page);
+            if page == "true" {
+                paging = true;
+            }
+        }
+        None => {
+            println!("No page param present.");
+        }
+    }
+
+    //Lookup API of podcast
+    let podcast_data: PIEpisodes;
+    let api_response = api_get_episodes(API_KEY, API_SECRET, &podcast_guid).await;
+    match api_response {
+        Ok(response_body) => {
+            //eprintln!("{:#?}", response_body);
+            match serde_json::from_str(response_body.as_str()) {
+                Ok(data) => {
+                    podcast_data = data;
+                }
+                Err(e) => {
+                    println!("Response prep error: [{:#?}].\n", e);
+                    return hyper::Response::builder()
+                        .status(StatusCode::from_u16(501).unwrap())
+                        .body(format!("Response prep error.").into())
+                        .unwrap();
+                }
+            }
+        }
+        Err(e) => {
+            println!("Response prep error: [{:#?}].\n", e);
+            return hyper::Response::builder()
+                .status(StatusCode::from_u16(501).unwrap())
+                .body(format!("Response prep error.").into())
+                .unwrap();
+        }
+    }
+
+    //If no page=true was given, just give the outbox configuration
+    let outbox_json;
+    if !paging {
+        let outbox_data = OutboxConfig {
+            context: "https://www.w3.org/ns/activitystreams".to_string(),
+            id: format!("https://ap.podcastindex.org/outbox?id={}", podcast_guid).to_string(),
+            r#type: "OrderedCollection".to_string(),
+            totalItems: podcast_data.count,
+            first: format!("https://ap.podcastindex.org/outbox?id={}&page=true", podcast_guid).to_string(),
+            last: format!("https://ap.podcastindex.org/outbox?id={}&page=true&min_id=0", podcast_guid).to_string(),
+        };
+
+        match serde_json::to_string_pretty(&outbox_data) {
+            Ok(json_result) => {
+                outbox_json = json_result;
+            }
+            Err(e) => {
+                println!("Response prep error: [{:#?}].\n", e);
+                return hyper::Response::builder()
+                    .status(StatusCode::from_u16(500).unwrap())
+                    .body(format!("Response prep error.").into())
+                    .unwrap();
+            }
+        }
+
+    //Otherwise give back a listing of episodes
+    } else {
+        let mut ordered_items = Vec::new();
+        for episode in podcast_data.items {
+            ordered_items.push(Item {
+                id: format!(
+                    "https://ap.podcastindex.org/statuses?id={}&statusid={}&resource=activity",
+                    podcast_guid,
+                    episode.guid
+                ).to_string(),
+                r#type: "Create".to_string(),
+                actor: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
+                published: iso8601(episode.datePublished),
+                directMessage: false,
+                to: vec!(
+                    "https://www.w3.org/ns/activitystreams#Public".to_string()
+                ),
+                object: Object {
+                    id: format!(
+                        "https://ap.podcastindex.org/statuses?id={}&statusid={}&resource=post",
+                        podcast_guid,
+                        episode.guid
+                    ).to_string(),
+                    r#type: "Note".to_string(),
+                    summary: None,
+                    inReplyTo: None,
+                    published: iso8601(episode.datePublished),
+                    url: format!(
+                        "https://ap.podcastindex.org/statuses?id={}&statusid={}&resource=public",
+                        podcast_guid,
+                        episode.guid
+                    ).to_string(),
+                    attributedTo: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
+                    to: vec!(
+                        "https://www.w3.org/ns/activitystreams#Public".to_string()
+                    ),
+                    cc: None,
+                    sensitive: false,
+                    conversation: format!(
+                        "tag:ap.podcastindex.org,{}:objectId={}:objectType=Conversation",
+                        iso8601(episode.datePublished),
+                        episode.guid
+                    ).to_string(),
+                    content: format!(
+                        "<p>{:.128}</p><p>{:.128}</p><p>Listen: {}</p>",
+                        episode.title,
+                        episode.description,
+                        episode.enclosureUrl
+                    ),
+                    attachment: vec!(),
+                },
+            })
+        }
+        let outbox_data = OutboxPaged {
+            context: "https://www.w3.org/ns/activitystreams".to_string(),
+            id: "https://www.w3.org/ns/activitystreams".to_string(),
+            r#type: "OrderedCollectionPage".to_string(),
+            next: format!("https://ap.podcastindex.org/outbox?id={}&page=true&max_id=999999", podcast_guid).to_string(),
+            prev: format!("https://ap.podcastindex.org/outbox?id={}&page=true&min_id=0", podcast_guid).to_string(),
+            partOf: format!("https://ap.podcastindex.org/outbox?id={}", podcast_guid).to_string(),
+            orderedItems: Some(ordered_items),
+        };
+
+        match serde_json::to_string_pretty(&outbox_data) {
+            Ok(json_result) => {
+                outbox_json = json_result;
+            }
+            Err(e) => {
+                println!("Response prep error: [{:#?}].\n", e);
+                return hyper::Response::builder()
+                    .status(StatusCode::from_u16(500).unwrap())
+                    .body(format!("Response prep error.").into())
+                    .unwrap();
+            }
+        }
+    }
+
+    return hyper::Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-type", "application/activity+json; charset=utf-8")
+        .body(format!("{}", outbox_json).into())
+        .unwrap();
+
+}
+
+
+
+//API calls --------------------------------------------------------------------------------------------------
 pub async fn api_get_podcast(key: &'static str, secret: &'static str, query: &str) -> Result<String, Box<dyn Error>> {
     println!("Running...");
 
@@ -498,4 +762,65 @@ pub async fn api_get_podcast(key: &'static str, secret: &'static str, query: &st
         }
     }
 
+}
+
+pub async fn api_get_episodes(key: &'static str, secret: &'static str, query: &str) -> Result<String, Box<dyn Error>> {
+    println!("Running...");
+
+    let api_key = key;
+    let api_secret = secret;
+
+    //##: ======== Required values ========
+    //##: WARNING: don't publish these to public repositories or in public places!
+    //##: NOTE: values below are sample values, to get your own values go to https://api.podcastindex.org
+    let api_time = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time mismatch.").as_secs().to_string();
+
+    //##: Create the authorization token.
+    //##: The auth token is built by creating an sha1 hash of the key, secret and current time (as a string)
+    //##: concatenated together. The hash is a lowercase string.
+    let data4hash: String = format!("{}{}{}", api_key, api_secret, api_time);
+    println!("Data to hash: [{}]", data4hash);
+    let mut hasher = Sha1::new();
+    hasher.update(data4hash);
+    let authorization_token = hasher.finalize();
+    let api_hash: String = format!("{:X}", authorization_token).to_lowercase();
+    println!("Hash String: [{}]", api_hash);
+
+    //##: Set up the parameters and the api endpoint url to call and make sure all params are
+    //##: url encoded before sending.
+    let url: String = format!("https://api.podcastindex.org/api/1.0/episodes/byfeedid?id={}", urlencoding::encode(query));
+
+    //##: Build the query with the required headers
+    let mut headers = header::HeaderMap::new();
+    headers.insert("User-Agent", header::HeaderValue::from_static("Rust-podcastindex-org-example/v1.0"));
+    headers.insert("X-Auth-Date", header::HeaderValue::from_str(api_time.as_str()).unwrap());
+    headers.insert("X-Auth-Key", header::HeaderValue::from_static(api_key));
+    headers.insert("Authorization", header::HeaderValue::from_str(api_hash.as_str()).unwrap());
+    let client = reqwest::Client::builder().default_headers(headers).build().unwrap();
+
+    //##: Send the request and display the results or the error
+    let res = client.get(url.as_str()).send();
+    match res.await {
+        Ok(res) => {
+            println!("Response Status: [{}]", res.status());
+            return Ok(res.text().await.unwrap())
+        },
+        Err(e) => {
+            eprintln!("API response error: [{}]", e);
+            return Err(Box::new(HydraError(format!("Error running SQL query: [{}]", e).into())));
+        }
+    }
+
+}
+
+
+
+//Utilities --------------------------------------------------------------------------------------------------
+fn iso8601(utime: u64) -> String {
+
+    // Create DateTime from SystemTime
+    let datetime = Utc.timestamp_opt(utime as i64, 0).unwrap();
+
+    // Formats the combined date and time with the specified format string.
+    datetime.format("%+").to_string()
 }
