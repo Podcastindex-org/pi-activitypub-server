@@ -96,50 +96,6 @@ impl Error for HydraError {}
 
 
 //Functions --------------------------------------------------------------------------------------------------
-// pub async fn home(ctx: Context) -> Response {
-//     let chat_id: &str;
-//
-//     //Get query parameters
-//     let params: HashMap<String, String> = ctx.req.uri().query().map(|v| {
-//         url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
-//     }).unwrap_or_else(HashMap::new);
-//
-//     println!("{:#?}", params);
-//
-//     //Make sure a session param was given
-//     match params.get("cid") {
-//         Some(cid) => {
-//             println!("Got a chat session id: {}\n", cid);
-//             chat_id = cid;
-//         }
-//         None => {
-//             println!("Invalid chat session id.\n");
-//             return hyper::Response::builder()
-//                 .status(StatusCode::from_u16(400).unwrap())
-//                 .body(format!("No chat session id given.").into())
-//                 .unwrap();
-//         }
-//     }
-//
-//     //Is the session valid
-//     // match mkultra::check_session(chat_id) {
-//     //     Ok(_) => {
-//     //         let doc = fs::read_to_string("home.html").expect("Something went wrong reading the file.");
-//     //         return hyper::Response::builder()
-//     //             .status(StatusCode::OK)
-//     //             .body(format!("{}", doc).into())
-//     //             .unwrap();
-//     //     }
-//     //     Err(_) => {
-//     //         return hyper::Response::builder()
-//     //             .status(StatusCode::from_u16(400).unwrap())
-//     //             .body(format!("That's not a live session.").into())
-//     //             .unwrap();
-//     //     }
-//     // }
-//
-// }
-
 pub async fn webfinger(ctx: Context) -> Response {
 
     //Get query parameters
@@ -197,10 +153,6 @@ pub async fn webfinger(ctx: Context) -> Response {
         }
     }
 
-
-
-
-
     //Construct a response
     let webfinger_data = Webfinger {
         subject: format!("acct:{}@podcastindex.org", podcast_guid).to_string(),
@@ -251,6 +203,7 @@ pub async fn webfinger(ctx: Context) -> Response {
 
     return hyper::Response::builder()
         .status(StatusCode::OK)
+        .header("Content-type", "application/json; charset=utf-8")
         .body(format!("{}", webfinger_json).into())
         .unwrap();
 
@@ -346,6 +299,7 @@ pub async fn actor(ctx: Context) -> Response {
 
     return hyper::Response::builder()
         .status(StatusCode::OK)
+        .header("Content-type", "application/activity+json; charset=utf-8")
         .body(format!("{}", actor_json).into())
         .unwrap();
 
