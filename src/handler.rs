@@ -10,8 +10,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use sha1::{Sha1, Digest};
 use urlencoding;
 use reqwest::header;
-use chrono::{TimeZone,Utc};
-
+use chrono::{TimeZone, Utc};
 
 
 //Globals ----------------------------------------------------------------------------------------------------
@@ -32,6 +31,7 @@ struct Link {
     #[serde(skip_serializing_if = "Option::is_none")]
     template: Option<String>,
 }
+
 #[derive(Serialize, Deserialize)]
 struct Webfinger {
     subject: String,
@@ -65,14 +65,18 @@ struct Attachment {
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
 struct Actor {
-    #[serde(rename="@context")]
+    #[serde(rename = "@context")]
     context: Vec<String>,
     id: String,
     r#type: String,
+    discoverable: bool,
     preferredUsername: String,
     name: String,
     inbox: String,
     outbox: String,
+    featured: String,
+    followers: String,
+    following: String,
     icon: Icon,
     summary: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -83,7 +87,7 @@ struct Actor {
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
 struct OutboxConfig {
-    #[serde(rename="@context")]
+    #[serde(rename = "@context")]
     context: String,
     id: String,
     r#type: String,
@@ -125,7 +129,7 @@ struct Item {
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
 struct OutboxPaged {
-    #[serde(rename="@context")]
+    #[serde(rename = "@context")]
     context: String,
     id: String,
     r#type: String,
@@ -135,6 +139,41 @@ struct OutboxPaged {
     totalItems: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     orderedItems: Option<Vec<Item>>,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize)]
+struct Featured {
+    #[serde(rename = "@context")]
+    context: String,
+    id: String,
+    r#type: String,
+    totalItems: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    orderedItems: Option<Vec<FeaturedItem>>,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize)]
+struct FeaturedItem {
+    #[serde(rename = "@context")]
+    at_context: String,
+    actor: String,
+    attachment: Vec<String>,
+    attributedTo: String,
+    cc: Option<Vec<String>>,
+    content: String,
+    context: String,
+    conversation: String,
+    id: String,
+    published: String,
+    repliesCount: u64,
+    sensitive: bool,
+    source: String,
+    summary: Option<String>,
+    tag: Vec<String>,
+    to: Vec<String>,
+    r#type: String,
 }
 
 #[allow(non_snake_case)]
@@ -159,7 +198,7 @@ struct PIFeed {
 #[derive(Serialize, Deserialize)]
 struct PIPodcast {
     status: String,
-    feed: PIFeed
+    feed: PIFeed,
 }
 
 #[allow(non_snake_case)]
@@ -207,6 +246,7 @@ pub async fn webfinger(ctx: Context) -> Response {
         url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
     }).unwrap_or_else(HashMap::new);
 
+    println!("----------");
     println!("Request: {} from: {:#?}", ctx.req.uri(), ctx.req.headers().get("user-agent"));
 
     //Make sure a session param was given
@@ -256,9 +296,6 @@ pub async fn webfinger(ctx: Context) -> Response {
                 .unwrap();
         }
     }
-
-    //Determine image type
-
 
     //Construct a response
     let webfinger_data = Webfinger {
@@ -313,7 +350,6 @@ pub async fn webfinger(ctx: Context) -> Response {
         .header("Content-type", "application/json; charset=utf-8")
         .body(format!("{}", webfinger_json).into())
         .unwrap();
-
 }
 
 pub async fn podcasts(ctx: Context) -> Response {
@@ -323,6 +359,7 @@ pub async fn podcasts(ctx: Context) -> Response {
         url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
     }).unwrap_or_else(HashMap::new);
 
+    println!("----------");
     println!("Request: {} from: {:#?}", ctx.req.uri(), ctx.req.headers().get("user-agent"));
 
     //Make sure a session param was given
@@ -381,10 +418,14 @@ pub async fn podcasts(ctx: Context) -> Response {
         ),
         id: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
         r#type: "Person".to_string(),
+        discoverable: true,
         preferredUsername: podcast_guid.clone(),
         name: format!("{:.48}", podcast_data.feed.title).to_string(),
         inbox: format!("https://ap.podcastindex.org/inbox?id={}", podcast_guid).to_string(),
         outbox: format!("https://ap.podcastindex.org/outbox?id={}", podcast_guid).to_string(),
+        featured: format!("https://ap.podcastindex.org/featured?id={}", podcast_guid).to_string(),
+        followers: format!("https://ap.podcastindex.org/followers?id={}", podcast_guid).to_string(),
+        following: format!("https://ap.podcastindex.org/following?id={}", podcast_guid).to_string(),
         icon: Icon {
             r#type: "Image".to_string(),
             url: format!("{}", podcast_data.feed.image).to_string(),
@@ -422,7 +463,7 @@ pub async fn podcasts(ctx: Context) -> Response {
             id: format!("https://ap.podcastindex.org/podcasts?id={}#main-key", podcast_guid).to_string(),
             owner: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
             publicKeyPem: AP_PUBKEY.to_string(),
-        }
+        },
     };
 
     let actor_json;
@@ -444,7 +485,6 @@ pub async fn podcasts(ctx: Context) -> Response {
         .header("Content-type", "application/activity+json; charset=utf-8")
         .body(format!("{}", actor_json).into())
         .unwrap();
-
 }
 
 pub async fn profiles(ctx: Context) -> Response {
@@ -454,6 +494,7 @@ pub async fn profiles(ctx: Context) -> Response {
         url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
     }).unwrap_or_else(HashMap::new);
 
+    println!("----------");
     println!("Request: {} from: {:#?}", ctx.req.uri(), ctx.req.headers().get("user-agent"));
 
     //Make sure a session param was given
@@ -525,14 +566,13 @@ pub async fn profiles(ctx: Context) -> Response {
     Empty
   </body>
   </html>",
-                podcast_data.feed.title,
-                format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
-                podcast_data.feed.description,
-                podcast_data.feed.image
+                    podcast_data.feed.title,
+                    format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
+                    podcast_data.feed.description,
+                    podcast_data.feed.image
             ).into()
         )
         .unwrap();
-
 }
 
 pub async fn outbox(ctx: Context) -> Response {
@@ -542,6 +582,7 @@ pub async fn outbox(ctx: Context) -> Response {
         url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
     }).unwrap_or_else(HashMap::new);
 
+    println!("----------");
     println!("Request: {} from: {:#?}", ctx.req.uri(), ctx.req.headers().get("user-agent"));
 
     //Make sure a session param was given
@@ -628,7 +669,7 @@ pub async fn outbox(ctx: Context) -> Response {
             }
         }
 
-    //Otherwise give back a listing of episodes
+        //Otherwise give back a listing of episodes
     } else {
         let mut ordered_items = Vec::new();
         for episode in podcast_data.items {
@@ -711,7 +752,6 @@ pub async fn outbox(ctx: Context) -> Response {
         .header("Content-type", "application/activity+json; charset=utf-8")
         .body(format!("{}", outbox_json).into())
         .unwrap();
-
 }
 
 pub async fn inbox(ctx: Context) -> Response {
@@ -721,6 +761,7 @@ pub async fn inbox(ctx: Context) -> Response {
         url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
     }).unwrap_or_else(HashMap::new);
 
+    println!("----------");
     println!("Request: {} from: {:#?}", ctx.req.uri(), ctx.req.headers().get("user-agent"));
 
     //Make sure a session param was given
@@ -750,6 +791,95 @@ pub async fn inbox(ctx: Context) -> Response {
         .unwrap();
 }
 
+pub async fn featured(ctx: Context) -> Response {
+
+    //Get query parameters
+    let params: HashMap<String, String> = ctx.req.uri().query().map(|v| {
+        url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
+    }).unwrap_or_else(HashMap::new);
+
+    println!("----------");
+    println!("Request: {} from: {:#?}", ctx.req.uri(), ctx.req.headers().get("user-agent"));
+
+    //Make sure a session param was given
+    let guid;
+    match params.get("id") {
+        Some(resource) => {
+            println!("  Id: {}\n", resource);
+            let parts = resource.replace("acct:", "");
+            guid = parts.split("@").next().unwrap().to_string();
+        }
+        None => {
+            println!("Invalid resource.\n");
+            return hyper::Response::builder()
+                .status(StatusCode::from_u16(400).unwrap())
+                .body(format!("No resource given.").into())
+                .unwrap();
+        }
+    }
+    let podcast_guid = guid.clone();
+
+    //If no page=true was given, just give the outbox configuration
+    let outbox_json;
+    let mut ordered_items = Vec::new();
+    ordered_items.push(FeaturedItem {
+        at_context: "https://www.w3.org/ns/activitystreams".to_string(),
+        actor: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
+        attachment: vec!(),
+        attributedTo: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
+        cc: None,
+        content: "This mastodon account is a podcast.  Follow to see new episodes.".to_string(),
+        context: format!(
+            "https://ap.podcastindex.org/statuses?id={}&statusid=0",
+            podcast_guid
+        ).to_string(),
+        conversation: format!(
+            "https://ap.podcastindex.org/statuses?id={}&statusid=0",
+            podcast_guid
+        ).to_string(),
+        id: format!(
+            "https://ap.podcastindex.org/statuses?id={}&statusid=0",
+            podcast_guid
+        ).to_string(),
+        published: iso8601(get_sys_time_in_secs()),
+        repliesCount: 0,
+        sensitive: false,
+        source: "This mastodon account is a podcast.  Follow to see new episodes.".to_string(),
+        summary: Some("".to_string()),
+        tag: vec!(),
+        to: vec!(
+            "https://www.w3.org/ns/activitystreams#Public".to_string()
+        ),
+        r#type: "Note".to_string(),
+    });
+    let outbox_data = Featured {
+        context: "https://www.w3.org/ns/activitystreams".to_string(),
+        id: "https://www.w3.org/ns/activitystreams".to_string(),
+        r#type: "OrderedCollection".to_string(),
+        totalItems: 1,
+        orderedItems: Some(ordered_items),
+    };
+
+    match serde_json::to_string_pretty(&outbox_data) {
+        Ok(json_result) => {
+            outbox_json = json_result;
+        }
+        Err(e) => {
+            println!("Response prep error: [{:#?}].\n", e);
+            return hyper::Response::builder()
+                .status(StatusCode::from_u16(500).unwrap())
+                .body(format!("Response prep error.").into())
+                .unwrap();
+        }
+    }
+
+
+    return hyper::Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-type", "application/activity+json; charset=utf-8")
+        .body(format!("{}", outbox_json).into())
+        .unwrap();
+}
 
 
 //API calls --------------------------------------------------------------------------------------------------
@@ -792,14 +922,13 @@ pub async fn api_get_podcast(key: &'static str, secret: &'static str, query: &st
     match res.await {
         Ok(res) => {
             println!("Response Status: [{}]", res.status());
-            return Ok(res.text().await.unwrap())
-        },
+            return Ok(res.text().await.unwrap());
+        }
         Err(e) => {
             eprintln!("API response error: [{}]", e);
             return Err(Box::new(HydraError(format!("Error running SQL query: [{}]", e).into())));
         }
     }
-
 }
 
 pub async fn api_get_episodes(key: &'static str, secret: &'static str, query: &str) -> Result<String, Box<dyn Error>> {
@@ -841,16 +970,14 @@ pub async fn api_get_episodes(key: &'static str, secret: &'static str, query: &s
     match res.await {
         Ok(res) => {
             println!("Response Status: [{}]", res.status());
-            return Ok(res.text().await.unwrap())
-        },
+            return Ok(res.text().await.unwrap());
+        }
         Err(e) => {
             eprintln!("API response error: [{}]", e);
             return Err(Box::new(HydraError(format!("Error running SQL query: [{}]", e).into())));
         }
     }
-
 }
-
 
 
 //Utilities --------------------------------------------------------------------------------------------------
@@ -861,4 +988,11 @@ fn iso8601(utime: u64) -> String {
 
     // Formats the combined date and time with the specified format string.
     datetime.format("%+").to_string()
+}
+
+fn get_sys_time_in_secs() -> u64 {
+    match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+        Ok(n) => n.as_secs(),
+        Err(_) => panic!("SystemTime before UNIX EPOCH!"),
+    }
 }

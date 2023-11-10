@@ -63,6 +63,7 @@ async fn main() {
     router.get("/podcasts", Box::new(handler::podcasts)); //JSON activity page
     router.get("/inbox", Box::new(handler::inbox)); //User inbox
     router.get("/outbox", Box::new(handler::outbox)); //User outbox
+    router.get("/featured", Box::new(handler::featured)); //User outbox
     router.get("/.well-known/webfinger", Box::new(handler::webfinger)); //Webfinger
 
     let shared_router = Arc::new(router);
