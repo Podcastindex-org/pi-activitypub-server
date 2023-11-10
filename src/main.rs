@@ -66,6 +66,7 @@ async fn main() {
     router.get("/featured", Box::new(handler::featured)); //Featured posts
     router.get("/statuses", Box::new(handler::statuses)); //Statuses
     router.get("/contexts", Box::new(handler::statuses)); //Contexts
+    router.get("/followers", Box::new(handler::followers)); //Followers
     router.get("/.well-known/webfinger", Box::new(handler::webfinger)); //Webfinger
 
     let shared_router = Arc::new(router);
