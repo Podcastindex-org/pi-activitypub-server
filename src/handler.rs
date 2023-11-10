@@ -145,7 +145,7 @@ struct OutboxPaged {
 #[derive(Serialize, Deserialize)]
 struct Featured {
     #[serde(rename = "@context")]
-    context: String,
+    at_context: Vec<String>,
     id: String,
     r#type: String,
     totalItems: u64,
@@ -157,7 +157,7 @@ struct Featured {
 #[derive(Serialize, Deserialize)]
 struct FeaturedItem {
     #[serde(rename = "@context")]
-    at_context: String,
+    at_context: Vec<String>,
     actor: String,
     attachment: Vec<String>,
     attributedTo: String,
@@ -823,11 +823,19 @@ pub async fn featured(ctx: Context) -> Response {
     let outbox_json;
     let mut ordered_items = Vec::new();
     ordered_items.push(FeaturedItem {
-        at_context: "https://www.w3.org/ns/activitystreams".to_string(),
+        at_context: vec!(
+            "https://www.w3.org/ns/activitystreams".to_string(),
+            "https://activitypub.agates.io/schemas/litepub-0.1.jsonld".to_string(),
+        ),
         actor: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
         attachment: vec!(),
         attributedTo: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
-        cc: None,
+        cc: Some(vec!(
+            format!(
+                "https://ap.podcastindex.org/followers?id={}",
+                podcast_guid
+            ).to_string()
+        )),
         content: "This account is a podcast.  Follow to see new episodes.".to_string(),
         context: format!(
             "https://ap.podcastindex.org/contexts?id={}&statusid=0",
@@ -853,7 +861,10 @@ pub async fn featured(ctx: Context) -> Response {
         r#type: "Note".to_string(),
     });
     let outbox_data = Featured {
-        context: "https://www.w3.org/ns/activitystreams".to_string(),
+        at_context: vec!(
+            "https://www.w3.org/ns/activitystreams".to_string(),
+            "https://activitypub.agates.io/schemas/litepub-0.1.jsonld".to_string(),
+        ),
         id: "https://www.w3.org/ns/activitystreams".to_string(),
         r#type: "OrderedCollection".to_string(),
         totalItems: 1,
