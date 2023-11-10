@@ -185,6 +185,29 @@ struct FeaturedItem {
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
+struct Status {
+    #[serde(rename = "@context")]
+    at_context: Vec<String>,
+    id: String,
+    r#type: String,
+    summary: Option<String>,
+    inReplyTo: Option<String>,
+    published: String,
+    url: Option<String>,
+    attributedTo: String,
+    to: Vec<String>,
+    cc: Option<Vec<String>>,
+    sensitive: bool,
+    conversation: String,
+    content: String,
+    attachment: Vec<String>,
+    actor: String,
+    tag: Vec<String>,
+    replies: Option<String>,    //TODO: This should refer to some sort of Collection struct
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize)]
 struct PIFeed {
     id: u64,
     podcastGuid: String,
@@ -689,7 +712,7 @@ pub async fn outbox(ctx: Context) -> Response {
         for episode in podcast_data.items {
             ordered_items.push(Item {
                 id: format!(
-                    "https://ap.podcastindex.org/statuses?id={}&statusid={}&resource=activity",
+                    "https://ap.podcastindex.org/episodes?id={}&statusid={}&resource=activity",
                     podcast_guid,
                     episode.guid
                 ).to_string(),
@@ -702,7 +725,7 @@ pub async fn outbox(ctx: Context) -> Response {
                 ),
                 object: Object {
                     id: format!(
-                        "https://ap.podcastindex.org/statuses?id={}&statusid={}&resource=post",
+                        "https://ap.podcastindex.org/episodes?id={}&statusid={}&resource=post",
                         podcast_guid,
                         episode.guid
                     ).to_string(),
@@ -711,7 +734,7 @@ pub async fn outbox(ctx: Context) -> Response {
                     inReplyTo: None,
                     published: iso8601(episode.datePublished),
                     url: format!(
-                        "https://ap.podcastindex.org/statuses?id={}&statusid={}&resource=public",
+                        "https://ap.podcastindex.org/episodes?id={}&statusid={}&resource=public",
                         podcast_guid,
                         episode.guid
                     ).to_string(),
@@ -771,30 +794,30 @@ pub async fn outbox(ctx: Context) -> Response {
 pub async fn inbox(ctx: Context) -> Response {
 
     //Get query parameters
-    let params: HashMap<String, String> = ctx.req.uri().query().map(|v| {
-        url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
-    }).unwrap_or_else(HashMap::new);
+    // let params: HashMap<String, String> = ctx.req.uri().query().map(|v| {
+    //     url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
+    // }).unwrap_or_else(HashMap::new);
 
     println!("\n\n----------");
     println!("Request: {} from: {:#?}", ctx.req.uri(), ctx.req.headers().get("user-agent"));
 
-    //Make sure a session param was given
-    let guid;
-    match params.get("id") {
-        Some(resource) => {
-            println!("  Id: {}\n", resource);
-            let parts = resource.replace("acct:", "");
-            guid = parts.split("@").next().unwrap().to_string();
-        }
-        None => {
-            println!("Invalid resource.\n");
-            return hyper::Response::builder()
-                .status(StatusCode::from_u16(400).unwrap())
-                .body(format!("No resource given.").into())
-                .unwrap();
-        }
-    }
-    let podcast_guid = guid.clone();
+    // //Make sure a session param was given
+    // let guid;
+    // match params.get("id") {
+    //     Some(resource) => {
+    //         println!("  Id: {}\n", resource);
+    //         let parts = resource.replace("acct:", "");
+    //         guid = parts.split("@").next().unwrap().to_string();
+    //     }
+    //     None => {
+    //         println!("Invalid resource.\n");
+    //         return hyper::Response::builder()
+    //             .status(StatusCode::from_u16(400).unwrap())
+    //             .body(format!("No resource given.").into())
+    //             .unwrap();
+    //     }
+    // }
+    // let podcast_guid = guid.clone();
 
     //TODO: validate the key signature before accepting request
 
@@ -859,7 +882,7 @@ pub async fn featured(ctx: Context) -> Response {
             podcast_guid
         ).to_string(),
         id: format!(
-            "https://ap.podcastindex.org/statuses?id={}&statusid=0",
+            "https://ap.podcastindex.org/episodes?id={}&statusid=0",
             podcast_guid
         ).to_string(),
         published: "2023-11-09T15:56:28.495803Z".to_string(),
@@ -904,7 +927,7 @@ pub async fn featured(ctx: Context) -> Response {
         .unwrap();
 }
 
-pub async fn statuses(ctx: Context) -> Response {
+pub async fn episodes(ctx: Context) -> Response {
 
     //Get query parameters
     let params: HashMap<String, String> = ctx.req.uri().query().map(|v| {
@@ -915,12 +938,12 @@ pub async fn statuses(ctx: Context) -> Response {
     println!("Request: {} from: {:#?}", ctx.req.uri(), ctx.req.headers().get("user-agent"));
 
     //Make sure a session param was given
-    let guid;
+    let podcast_guid;
     match params.get("id") {
         Some(resource) => {
             println!("  Id: {}\n", resource);
             let parts = resource.replace("acct:", "");
-            guid = parts.split("@").next().unwrap().to_string();
+            podcast_guid = parts.split("@").next().unwrap().to_string();
         }
         None => {
             println!("Invalid resource.\n");
@@ -930,42 +953,109 @@ pub async fn statuses(ctx: Context) -> Response {
                 .unwrap();
         }
     }
-    let podcast_guid = guid.clone();
+
+    //Get an episode guid, which will be a status
+    let episode_guid;
+    match params.get("statusid") {
+        Some(resource) => {
+            println!("  Status Id: {}\n", resource);
+            episode_guid = resource;
+        }
+        None => {
+            println!("Invalid status id.\n");
+            return hyper::Response::builder()
+                .status(StatusCode::from_u16(400).unwrap())
+                .body(format!("No status id given.").into())
+                .unwrap();
+        }
+    }
+
+    //If the status id was zero, then this is the pinned post
+    let mut episode_json = "".to_string();
+    if episode_guid == "0" {
+        let episode_data = Status {
+            at_context: vec!(
+                "https://www.w3.org/ns/activitystreams".to_string(),
+            ),
+            id: format!(
+                "https://ap.podcastindex.org/episodes?id={}&statusid=0",
+                podcast_guid
+            ).to_string(),
+            r#type: "Note".to_string(),
+            summary: None,
+            inReplyTo: None,
+            published: "2023-11-09T15:56:28.495803Z".to_string(),
+            url: None,
+            attributedTo: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
+            to: vec!(
+                "https://www.w3.org/ns/activitystreams#Public".to_string()
+            ),
+            cc: Some(vec!(
+                format!(
+                    "https://ap.podcastindex.org/followers?id={}",
+                    podcast_guid
+                ).to_string()
+            )),
+            sensitive: false,
+            conversation: format!(
+                "https://ap.podcastindex.org/contexts?id={}&statusid=0",
+                podcast_guid
+            ).to_string(),
+            content: "This account is a podcast.  Follow to see new episodes.".to_string(),
+            attachment: vec!(),
+            actor: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
+            tag: vec!(),
+            replies: None,
+        };
+
+        match serde_json::to_string_pretty(&episode_data) {
+            Ok(json_result) => {
+                episode_json = json_result;
+            }
+            Err(e) => {
+                println!("Response prep error: [{:#?}].\n", e);
+                return hyper::Response::builder()
+                    .status(StatusCode::from_u16(500).unwrap())
+                    .body(format!("Response prep error.").into())
+                    .unwrap();
+            }
+        }
+    }
 
     return hyper::Response::builder()
         .status(StatusCode::OK)
         .header("Content-type", "application/activity+json; charset=utf-8")
-        .body(format!("").into())
+        .body(format!("{}", episode_json).into())
         .unwrap();
 }
 
 pub async fn contexts(ctx: Context) -> Response {
 
     //Get query parameters
-    let params: HashMap<String, String> = ctx.req.uri().query().map(|v| {
-        url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
-    }).unwrap_or_else(HashMap::new);
+    // let params: HashMap<String, String> = ctx.req.uri().query().map(|v| {
+    //     url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
+    // }).unwrap_or_else(HashMap::new);
 
     println!("\n\n----------");
     println!("Request: {} from: {:#?}", ctx.req.uri(), ctx.req.headers().get("user-agent"));
 
     //Make sure a session param was given
-    let guid;
-    match params.get("id") {
-        Some(resource) => {
-            println!("  Id: {}\n", resource);
-            let parts = resource.replace("acct:", "");
-            guid = parts.split("@").next().unwrap().to_string();
-        }
-        None => {
-            println!("Invalid resource.\n");
-            return hyper::Response::builder()
-                .status(StatusCode::from_u16(400).unwrap())
-                .body(format!("No resource given.").into())
-                .unwrap();
-        }
-    }
-    let podcast_guid = guid.clone();
+    // let guid;
+    // match params.get("id") {
+    //     Some(resource) => {
+    //         println!("  Id: {}\n", resource);
+    //         let parts = resource.replace("acct:", "");
+    //         guid = parts.split("@").next().unwrap().to_string();
+    //     }
+    //     None => {
+    //         println!("Invalid resource.\n");
+    //         return hyper::Response::builder()
+    //             .status(StatusCode::from_u16(400).unwrap())
+    //             .body(format!("No resource given.").into())
+    //             .unwrap();
+    //     }
+    // }
+    // let podcast_guid = guid.clone();
 
     return hyper::Response::builder()
         .status(StatusCode::OK)
@@ -977,30 +1067,30 @@ pub async fn contexts(ctx: Context) -> Response {
 pub async fn followers(ctx: Context) -> Response {
 
     //Get query parameters
-    let params: HashMap<String, String> = ctx.req.uri().query().map(|v| {
-        url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
-    }).unwrap_or_else(HashMap::new);
+    // let params: HashMap<String, String> = ctx.req.uri().query().map(|v| {
+    //     url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
+    // }).unwrap_or_else(HashMap::new);
 
     println!("\n\n----------");
     println!("Request: {} from: {:#?}", ctx.req.uri(), ctx.req.headers().get("user-agent"));
 
     //Make sure a session param was given
-    let guid;
-    match params.get("id") {
-        Some(resource) => {
-            println!("  Id: {}\n", resource);
-            let parts = resource.replace("acct:", "");
-            guid = parts.split("@").next().unwrap().to_string();
-        }
-        None => {
-            println!("Invalid resource.\n");
-            return hyper::Response::builder()
-                .status(StatusCode::from_u16(400).unwrap())
-                .body(format!("No resource given.").into())
-                .unwrap();
-        }
-    }
-    let podcast_guid = guid.clone();
+    // let guid;
+    // match params.get("id") {
+    //     Some(resource) => {
+    //         println!("  Id: {}\n", resource);
+    //         let parts = resource.replace("acct:", "");
+    //         guid = parts.split("@").next().unwrap().to_string();
+    //     }
+    //     None => {
+    //         println!("Invalid resource.\n");
+    //         return hyper::Response::builder()
+    //             .status(StatusCode::from_u16(400).unwrap())
+    //             .body(format!("No resource given.").into())
+    //             .unwrap();
+    //     }
+    // }
+    // let podcast_guid = guid.clone();
 
     return hyper::Response::builder()
         .status(StatusCode::OK)
@@ -1117,9 +1207,9 @@ fn iso8601(utime: u64) -> String {
     datetime.format("%+").to_string()
 }
 
-fn get_sys_time_in_secs() -> u64 {
-    match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
-        Ok(n) => n.as_secs(),
-        Err(_) => panic!("SystemTime before UNIX EPOCH!"),
-    }
-}
+// fn get_sys_time_in_secs() -> u64 {
+//     match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+//         Ok(n) => n.as_secs(),
+//         Err(_) => panic!("SystemTime before UNIX EPOCH!"),
+//     }
+// }

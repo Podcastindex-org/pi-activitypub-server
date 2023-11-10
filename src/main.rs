@@ -64,8 +64,8 @@ async fn main() {
     router.get("/inbox", Box::new(handler::inbox)); //User inbox
     router.get("/outbox", Box::new(handler::outbox)); //User outbox
     router.get("/featured", Box::new(handler::featured)); //Featured posts
-    router.get("/statuses", Box::new(handler::statuses)); //Statuses
-    router.get("/contexts", Box::new(handler::statuses)); //Contexts
+    router.get("/episodes", Box::new(handler::episodes)); //Statuses
+    router.get("/contexts", Box::new(handler::contexts)); //Contexts
     router.get("/followers", Box::new(handler::followers)); //Followers
     router.get("/.well-known/webfinger", Box::new(handler::webfinger)); //Webfinger
 
