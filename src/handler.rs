@@ -830,11 +830,11 @@ pub async fn featured(ctx: Context) -> Response {
         cc: None,
         content: "This account is a podcast.  Follow to see new episodes.".to_string(),
         context: format!(
-            "https://ap.podcastindex.org/statuses?id={}&statusid=0",
+            "https://ap.podcastindex.org/contexts?id={}&statusid=0",
             podcast_guid
         ).to_string(),
         conversation: format!(
-            "https://ap.podcastindex.org/statuses?id={}&statusid=0",
+            "https://ap.podcastindex.org/contexts?id={}&statusid=0",
             podcast_guid
         ).to_string(),
         id: format!(
@@ -881,6 +881,75 @@ pub async fn featured(ctx: Context) -> Response {
         .unwrap();
 }
 
+pub async fn statuses(ctx: Context) -> Response {
+
+    //Get query parameters
+    let params: HashMap<String, String> = ctx.req.uri().query().map(|v| {
+        url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
+    }).unwrap_or_else(HashMap::new);
+
+    println!("----------");
+    println!("Request: {} from: {:#?}", ctx.req.uri(), ctx.req.headers().get("user-agent"));
+
+    //Make sure a session param was given
+    let guid;
+    match params.get("id") {
+        Some(resource) => {
+            println!("  Id: {}\n", resource);
+            let parts = resource.replace("acct:", "");
+            guid = parts.split("@").next().unwrap().to_string();
+        }
+        None => {
+            println!("Invalid resource.\n");
+            return hyper::Response::builder()
+                .status(StatusCode::from_u16(400).unwrap())
+                .body(format!("No resource given.").into())
+                .unwrap();
+        }
+    }
+    let podcast_guid = guid.clone();
+
+    return hyper::Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-type", "application/activity+json; charset=utf-8")
+        .body(format!("").into())
+        .unwrap();
+}
+
+pub async fn contexts(ctx: Context) -> Response {
+
+    //Get query parameters
+    let params: HashMap<String, String> = ctx.req.uri().query().map(|v| {
+        url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
+    }).unwrap_or_else(HashMap::new);
+
+    println!("----------");
+    println!("Request: {} from: {:#?}", ctx.req.uri(), ctx.req.headers().get("user-agent"));
+
+    //Make sure a session param was given
+    let guid;
+    match params.get("id") {
+        Some(resource) => {
+            println!("  Id: {}\n", resource);
+            let parts = resource.replace("acct:", "");
+            guid = parts.split("@").next().unwrap().to_string();
+        }
+        None => {
+            println!("Invalid resource.\n");
+            return hyper::Response::builder()
+                .status(StatusCode::from_u16(400).unwrap())
+                .body(format!("No resource given.").into())
+                .unwrap();
+        }
+    }
+    let podcast_guid = guid.clone();
+
+    return hyper::Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-type", "application/activity+json; charset=utf-8")
+        .body(format!("").into())
+        .unwrap();
+}
 
 //API calls --------------------------------------------------------------------------------------------------
 pub async fn api_get_podcast(key: &'static str, secret: &'static str, query: &str) -> Result<String, Box<dyn Error>> {
