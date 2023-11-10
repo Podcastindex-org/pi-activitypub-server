@@ -828,7 +828,7 @@ pub async fn featured(ctx: Context) -> Response {
         attachment: vec!(),
         attributedTo: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
         cc: None,
-        content: "This mastodon account is a podcast.  Follow to see new episodes.".to_string(),
+        content: "This account is a podcast.  Follow to see new episodes.".to_string(),
         context: format!(
             "https://ap.podcastindex.org/statuses?id={}&statusid=0",
             podcast_guid
@@ -841,10 +841,10 @@ pub async fn featured(ctx: Context) -> Response {
             "https://ap.podcastindex.org/statuses?id={}&statusid=0",
             podcast_guid
         ).to_string(),
-        published: iso8601(get_sys_time_in_secs()),
+        published: "2023-11-09T15:56:28.495803Z".to_string(),
         repliesCount: 0,
         sensitive: false,
-        source: "This mastodon account is a podcast.  Follow to see new episodes.".to_string(),
+        source: "This account is a podcast.  Follow to see new episodes.".to_string(),
         summary: Some("".to_string()),
         tag: vec!(),
         to: vec!(
