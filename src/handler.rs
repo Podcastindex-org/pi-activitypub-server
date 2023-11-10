@@ -825,7 +825,6 @@ pub async fn featured(ctx: Context) -> Response {
     ordered_items.push(FeaturedItem {
         at_context: vec!(
             "https://www.w3.org/ns/activitystreams".to_string(),
-            "https://activitypub.agates.io/schemas/litepub-0.1.jsonld".to_string(),
         ),
         actor: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
         attachment: vec!(),
@@ -863,7 +862,6 @@ pub async fn featured(ctx: Context) -> Response {
     let outbox_data = Featured {
         at_context: vec!(
             "https://www.w3.org/ns/activitystreams".to_string(),
-            "https://activitypub.agates.io/schemas/litepub-0.1.jsonld".to_string(),
         ),
         id: "https://www.w3.org/ns/activitystreams".to_string(),
         r#type: "OrderedCollection".to_string(),
