@@ -66,11 +66,16 @@ struct Attachment {
 #[derive(Serialize, Deserialize)]
 struct Actor {
     #[serde(rename = "@context")]
-    context: Vec<String>,
+    at_context: Vec<String>,
     id: String,
     r#type: String,
     discoverable: bool,
+    indexable: bool,
     preferredUsername: String,
+    published: String,
+    memorial: bool,
+    devices: Option<String>,
+    tag: Vec<String>,
     name: String,
     inbox: String,
     outbox: String,
@@ -79,6 +84,8 @@ struct Actor {
     following: String,
     icon: Icon,
     summary: String,
+    url: String,
+    manuallyApprovesFollowers: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     attachment: Option<Vec<Attachment>>,
     publicKey: PublicKey,
@@ -412,7 +419,7 @@ pub async fn podcasts(ctx: Context) -> Response {
 
     //Construct a response
     let actor_data = Actor {
-        context: vec!(
+        at_context: vec!(
             "https://www.w3.org/ns/activitystreams".to_string(),
             "https://w3id.org/security/v1".to_string(),
         ),
@@ -464,6 +471,13 @@ pub async fn podcasts(ctx: Context) -> Response {
             owner: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
             publicKeyPem: AP_PUBKEY.to_string(),
         },
+        url: format!("https://podcastindex.org/podcast/{}", podcast_guid).to_string(),
+        manuallyApprovesFollowers: false,
+        indexable: true,
+        memorial: false,
+        published: "2023-11-09T15:56:28.495803Z".to_string(),
+        devices: None,
+        tag: vec!(),
     };
 
     let actor_json;
