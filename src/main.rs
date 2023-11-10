@@ -61,7 +61,7 @@ async fn main() {
     let mut router: Router = Router::new();
     router.get("/profiles", Box::new(handler::profiles)); //User profile html page
     router.get("/podcasts", Box::new(handler::podcasts)); //JSON activity page
-    //router.get("/inbox", Box::new(handler::inbox)); //User inbox
+    router.get("/inbox", Box::new(handler::inbox)); //User inbox
     router.get("/outbox", Box::new(handler::outbox)); //User outbox
     router.get("/.well-known/webfinger", Box::new(handler::webfinger)); //Webfinger
 

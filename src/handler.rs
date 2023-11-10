@@ -712,6 +712,42 @@ pub async fn outbox(ctx: Context) -> Response {
 
 }
 
+pub async fn inbox(ctx: Context) -> Response {
+
+    //Get query parameters
+    let params: HashMap<String, String> = ctx.req.uri().query().map(|v| {
+        url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
+    }).unwrap_or_else(HashMap::new);
+
+    println!("Request: {} from: {:#?}", ctx.req.uri(), ctx.req.headers().get("user-agent"));
+
+    //Make sure a session param was given
+    let guid;
+    match params.get("id") {
+        Some(resource) => {
+            println!("  Id: {}\n", resource);
+            let parts = resource.replace("acct:", "");
+            guid = parts.split("@").next().unwrap().to_string();
+        }
+        None => {
+            println!("Invalid resource.\n");
+            return hyper::Response::builder()
+                .status(StatusCode::from_u16(400).unwrap())
+                .body(format!("No resource given.").into())
+                .unwrap();
+        }
+    }
+    let podcast_guid = guid.clone();
+
+    //TODO: validate the key signature before accepting request
+
+    return hyper::Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-type", "application/activity+json; charset=utf-8")
+        .body(format!("").into())
+        .unwrap();
+}
+
 
 
 //API calls --------------------------------------------------------------------------------------------------
