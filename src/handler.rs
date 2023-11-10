@@ -132,6 +132,7 @@ struct OutboxPaged {
     next: String,
     prev: String,
     partOf: String,
+    totalItems: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     orderedItems: Option<Vec<Item>>,
 }
@@ -687,6 +688,7 @@ pub async fn outbox(ctx: Context) -> Response {
             next: format!("https://ap.podcastindex.org/outbox?id={}&page=true&max_id=999999", podcast_guid).to_string(),
             prev: format!("https://ap.podcastindex.org/outbox?id={}&page=true&min_id=0", podcast_guid).to_string(),
             partOf: format!("https://ap.podcastindex.org/outbox?id={}", podcast_guid).to_string(),
+            totalItems: podcast_data.count,
             orderedItems: Some(ordered_items),
         };
 
