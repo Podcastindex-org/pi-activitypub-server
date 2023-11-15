@@ -11,13 +11,15 @@ use sha1::{Sha1, Digest};
 use urlencoding;
 use reqwest::header;
 use chrono::{TimeZone, Utc};
+use rsa::{RsaPrivateKey, RsaPublicKey};
+use dbif::{ActorRecord};
 
 
 //Globals ----------------------------------------------------------------------------------------------------
 //TODO: These secrets need to be moved into the environment
 const API_KEY: &str = "B899NK69ERMRE2M6HD3B";
 const API_SECRET: &str = "J3v9m$4b6NCD9ENV4QEKYb^DnWdcGR$^Gq7#5uwS";
-const AP_PUBKEY: &str = "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArYGPVCRtdZXQLAYANU6R\nhH5e5bPQ8ImW7AxOkFRIoAhK0+zJOHsn6UIrpdXK7JcIdkR3pPEG620BVHUkZOVC\nYUsnW7gNWAPyeXMVUPO0h2okCyUIeOSoRuIto8AfsfaQOeLeCIt0bqHymX4FueRi\n6y3fpUlGkNMLJ6T1tfLXElwcNxNnzEV4dvCpwHh9lZwQKersbKFgpVFl5VO9+ZG+\nhO2ym6KMGeD09oPK7lvvhjItfEkqmzOVCkH4PRXaHwcst9lBNwSNKeUkNWfIg8Bd\nqFFCZMx6+VmwBeaFIa8ia9jMT2ofTZ56Whlx7Jo9j7wtTGNeo/HC0v4Uvkbw+o+v\nfQIDAQAB\n-----END PUBLIC KEY-----";
+
 
 //Structs ----------------------------------------------------------------------------------------------------
 #[allow(non_snake_case)]
@@ -440,6 +442,61 @@ pub async fn podcasts(ctx: Context) -> Response {
         }
     }
 
+    //If no keypair exists, create one
+    let pem_pub_key;
+    let pem_priv_key;
+    match dbif::get_actor_from_db(&"ap.db".to_string(), podcast_guid.parse::<u64>().unwrap()) {
+        Ok(actor_record) => {
+            pem_pub_key = actor_record.pem_public_key;
+            pem_priv_key = actor_record.pem_private_key;
+        }
+        Err(_) => {
+            //TODO: wip
+            let priv_key;
+            let pub_key;
+            {
+                let mut rng = rand::thread_rng();
+                let bits = 2048;
+                priv_key = RsaPrivateKey::new(&mut rng, bits).expect("failed to generate key");
+                pub_key = RsaPublicKey::from(&priv_key);
+            }
+            match pkcs1::EncodeRsaPrivateKey::to_pkcs1_pem(&priv_key, pkcs1::LineEnding::LF) {
+                Ok(pem_encoded_privkey) => {
+                    pem_priv_key = pem_encoded_privkey.to_string();
+                }
+                Err(e) => {
+                    println!("Pem private key export error: [{:#?}].\n", e);
+                    return hyper::Response::builder()
+                        .status(StatusCode::from_u16(501).unwrap())
+                        .body(format!("Key export error.").into())
+                        .unwrap();
+                }
+            }
+            println!("Private key: {:?}", pem_priv_key);
+            match pkcs1::EncodeRsaPublicKey::to_pkcs1_pem(&pub_key, pkcs1::LineEnding::LF) {
+                Ok(pem_encoded_pubkey) => {
+                    pem_pub_key = pem_encoded_pubkey.to_string();
+                }
+                Err(e) => {
+                    println!("Pem key export error: [{:#?}].\n", e);
+                    return hyper::Response::builder()
+                        .status(StatusCode::from_u16(501).unwrap())
+                        .body(format!("Key export error.").into())
+                        .unwrap();
+                }
+            }
+            println!("Public key: {:?}", pem_pub_key);
+
+            dbif::add_actor_to_db(&"ap.db".to_string(), ActorRecord {
+                pcid: podcast_guid.parse::<u64>().unwrap(),
+                guid: "".to_string(),
+                pem_private_key: pem_priv_key.clone(),
+                pem_public_key: pem_pub_key.clone(),
+            });
+        }
+    }
+
+
     //Construct a response
     let actor_data = Actor {
         at_context: vec!(
@@ -492,7 +549,7 @@ pub async fn podcasts(ctx: Context) -> Response {
         publicKey: PublicKey {
             id: format!("https://ap.podcastindex.org/podcasts?id={}#main-key", podcast_guid).to_string(),
             owner: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
-            publicKeyPem: AP_PUBKEY.to_string(),
+            publicKeyPem: pem_pub_key,
         },
         url: format!("https://podcastindex.org/podcast/{}", podcast_guid).to_string(),
         manuallyApprovesFollowers: false,
@@ -1098,6 +1155,8 @@ pub async fn followers(ctx: Context) -> Response {
         .body(format!("").into())
         .unwrap();
 }
+
+
 
 //API calls --------------------------------------------------------------------------------------------------
 pub async fn api_get_podcast(key: &'static str, secret: &'static str, query: &str) -> Result<String, Box<dyn Error>> {

@@ -47,14 +47,11 @@ async fn main() {
     let arg_chatid = &args[2];
 
     //TODO: these must handle errors better
-    //Validate the passed in chat id and clear anything else from the db
-    // if mkultra::init_database().is_err() {
-    //     eprintln!("Error initializing the database file.");
-    // }
-    // if mkultra::init_chat_session_with_id(arg_chatid).is_err() {
-    //     eprintln!("Error initializing chat: [{}] in the database.", arg_chatid);
-    // }
-    println!("Initialized session: [{}]", arg_chatid);
+    //Make sure we have a good database
+    if dbif::create_database(&"ap.db".to_string()).is_err() {
+        eprintln!("Error initializing the database file.");
+    }
+
 
     let some_state = "state".to_string();
 
