@@ -66,6 +66,12 @@ struct Attachment {
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
+struct Endpoints {
+    sharedInbox: String,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize)]
 struct Actor {
     #[serde(rename = "@context")]
     at_context: Vec<String>,
@@ -91,6 +97,7 @@ struct Actor {
     #[serde(skip_serializing_if = "Option::is_none")]
     attachment: Option<Vec<Attachment>>,
     publicKey: PublicKey,
+    endpoints: Endpoints,
 }
 
 #[allow(non_snake_case)]
@@ -550,6 +557,9 @@ pub async fn podcasts(ctx: Context) -> Response {
             id: format!("https://ap.podcastindex.org/podcasts?id={}#main-key", podcast_guid).to_string(),
             owner: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
             publicKeyPem: pem_pub_key,
+        },
+        endpoints: Endpoints {
+            sharedInbox: "https://ap.podcastindex.org/inbox?id=0".to_string(),
         },
         url: format!("https://podcastindex.org/podcast/{}", podcast_guid).to_string(),
         manuallyApprovesFollowers: false,
