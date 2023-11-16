@@ -14,8 +14,6 @@ use std::env;
 //use drop_root::set_user_group;
 
 //Globals ----------------------------------------------------------------------------------------------------
-//const ZMQ_SOCKET_ADDR: &str = "tcp://127.0.0.1:5555";
-
 mod handler;
 mod router;
 
@@ -44,7 +42,7 @@ async fn main() {
 
     let args: Vec<String> = env::args().collect();
     let arg_port = &args[1];
-    let arg_chatid = &args[2];
+    //let arg_chatid = &args[2];
 
     //TODO: these must handle errors better
     //Make sure we have a good database
@@ -57,9 +55,12 @@ async fn main() {
 
     let mut router: Router = Router::new();
     router.get("/profiles", Box::new(handler::profiles)); //User profile html page
-    router.get("/podcasts", Box::new(handler::podcasts)); //JSON activity page
-    router.get("/inbox", Box::new(handler::inbox)); //User inbox
-    router.get("/outbox", Box::new(handler::outbox)); //User outbox
+    router.get("/podcasts", Box::new(handler::podcasts)); //Actor profile page OUT
+    router.post("/podcasts", Box::new(handler::podcasts)); //Actor profile page IN
+    router.get("/inbox", Box::new(handler::inbox)); //User inbox OUT
+    router.post("/inbox", Box::new(handler::inbox)); //User inbox IN
+    router.get("/outbox", Box::new(handler::outbox)); //User outbox OUT
+    router.post("/outbox", Box::new(handler::outbox)); //User outbox IN
     router.get("/featured", Box::new(handler::featured)); //Featured posts
     router.get("/episodes", Box::new(handler::episodes)); //Statuses
     router.get("/contexts", Box::new(handler::contexts)); //Contexts

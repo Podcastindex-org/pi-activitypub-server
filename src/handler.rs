@@ -42,7 +42,7 @@ struct Webfinger {
 }
 
 #[allow(non_snake_case)]
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct PublicKey {
     id: String,
     owner: String,
@@ -50,14 +50,14 @@ struct PublicKey {
 }
 
 #[allow(non_snake_case)]
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct Icon {
     r#type: String,
     url: String,
 }
 
 #[allow(non_snake_case)]
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct Attachment {
     name: String,
     r#type: String,
@@ -65,15 +65,22 @@ struct Attachment {
 }
 
 #[allow(non_snake_case)]
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct Endpoints {
     sharedInbox: String,
 }
 
 #[allow(non_snake_case)]
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
+struct ActorKeys {
+    pem_private_key: String,
+    pem_public_key: String,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize, Debug)]
 struct Actor {
-    #[serde(rename = "@context")]
+    #[serde(rename = "@context", skip_deserializing)]
     at_context: Vec<String>,
     id: String,
     r#type: String,
@@ -98,6 +105,26 @@ struct Actor {
     attachment: Option<Vec<Attachment>>,
     publicKey: PublicKey,
     endpoints: Endpoints,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize, Debug)]
+struct InboxRequest {
+    id: String,
+    r#type: String,
+    actor: String,
+    object: String,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize, Debug)]
+struct InboxRequestAccept {
+    #[serde(rename = "@context", skip_deserializing)]
+    at_context: String,
+    id: String,
+    r#type: String,
+    actor: String,
+    object: InboxRequest,
 }
 
 #[allow(non_snake_case)]
@@ -292,7 +319,7 @@ pub async fn webfinger(ctx: Context) -> Response {
     let guid;
     match params.get("resource") {
         Some(resource) => {
-            println!("  Resource: {}\n", resource);
+            println!("  Id: {}\n", resource);
             let parts = resource.replace("acct:", "");
             guid = parts.split("@").next().unwrap().to_string();
         }
@@ -417,7 +444,6 @@ pub async fn podcasts(ctx: Context) -> Response {
                 .unwrap();
         }
     }
-
     let podcast_guid = guid.clone();
 
     //Lookup API of podcast
@@ -450,126 +476,32 @@ pub async fn podcasts(ctx: Context) -> Response {
     }
 
     //If no keypair exists, create one
-    let pem_pub_key;
-    let pem_priv_key;
-    match dbif::get_actor_from_db(&"ap.db".to_string(), podcast_guid.parse::<u64>().unwrap()) {
-        Ok(actor_record) => {
-            pem_pub_key = actor_record.pem_public_key;
-            pem_priv_key = actor_record.pem_private_key;
+    let actor_keys;
+    match ap_get_actor_keys(podcast_guid.parse::<u64>().unwrap()) {
+        Ok(keys) => {
+            actor_keys = keys;
         }
-        Err(_) => {
-            //TODO: wip
-            let priv_key;
-            let pub_key;
-            {
-                let mut rng = rand::thread_rng();
-                let bits = 2048;
-                priv_key = RsaPrivateKey::new(&mut rng, bits).expect("failed to generate key");
-                pub_key = RsaPublicKey::from(&priv_key);
-            }
-            match pkcs1::EncodeRsaPrivateKey::to_pkcs1_pem(&priv_key, pkcs1::LineEnding::LF) {
-                Ok(pem_encoded_privkey) => {
-                    pem_priv_key = pem_encoded_privkey.to_string();
-                }
-                Err(e) => {
-                    println!("Pem private key export error: [{:#?}].\n", e);
-                    return hyper::Response::builder()
-                        .status(StatusCode::from_u16(501).unwrap())
-                        .body(format!("Key export error.").into())
-                        .unwrap();
-                }
-            }
-            println!("Private key: {:?}", pem_priv_key);
-            match pkcs1::EncodeRsaPublicKey::to_pkcs1_pem(&pub_key, pkcs1::LineEnding::LF) {
-                Ok(pem_encoded_pubkey) => {
-                    pem_pub_key = pem_encoded_pubkey.to_string();
-                }
-                Err(e) => {
-                    println!("Pem key export error: [{:#?}].\n", e);
-                    return hyper::Response::builder()
-                        .status(StatusCode::from_u16(501).unwrap())
-                        .body(format!("Key export error.").into())
-                        .unwrap();
-                }
-            }
-            println!("Public key: {:?}", pem_pub_key);
-
-            dbif::add_actor_to_db(&"ap.db".to_string(), ActorRecord {
-                pcid: podcast_guid.parse::<u64>().unwrap(),
-                guid: "".to_string(),
-                pem_private_key: pem_priv_key.clone(),
-                pem_public_key: pem_pub_key.clone(),
-            });
+        Err(e) => {
+            return hyper::Response::builder()
+                .status(StatusCode::from_u16(500).unwrap())
+                .body(format!("Key error.").into())
+                .unwrap();
         }
     }
 
-
     //Construct a response
-    let actor_data = Actor {
-        at_context: vec!(
-            "https://www.w3.org/ns/activitystreams".to_string(),
-            "https://w3id.org/security/v1".to_string(),
-        ),
-        id: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
-        r#type: "Person".to_string(),
-        discoverable: true,
-        preferredUsername: podcast_guid.clone(),
-        name: format!("{:.48}", podcast_data.feed.title).to_string(),
-        inbox: format!("https://ap.podcastindex.org/inbox?id={}", podcast_guid).to_string(),
-        outbox: format!("https://ap.podcastindex.org/outbox?id={}", podcast_guid).to_string(),
-        featured: format!("https://ap.podcastindex.org/featured?id={}", podcast_guid).to_string(),
-        followers: format!("https://ap.podcastindex.org/followers?id={}", podcast_guid).to_string(),
-        following: format!("https://ap.podcastindex.org/following?id={}", podcast_guid).to_string(),
-        icon: Icon {
-            r#type: "Image".to_string(),
-            url: format!("{}", podcast_data.feed.image).to_string(),
-        },
-        summary: format!("{:.96}", podcast_data.feed.description),
-        attachment: Some(vec!(
-            Attachment {
-                name: "Index".to_string(),
-                r#type: "PropertyValue".to_string(),
-                value: format!(
-                    "<a href='https://podcastindex.org/podcast/{}' rel='ugc'>https://podcastindex.org/podcast/{}</a>",
-                    podcast_guid,
-                    podcast_guid,
-                ).to_string(),
-            },
-            Attachment {
-                name: "Website".to_string(),
-                r#type: "PropertyValue".to_string(),
-                value: format!(
-                    "<a href='{}' rel='ugc'>{}</a>",
-                    podcast_data.feed.link,
-                    podcast_data.feed.link,
-                ).to_string(),
-            },
-            Attachment {
-                name: "Podcast Guid".to_string(),
-                r#type: "PropertyValue".to_string(),
-                value: format!(
-                    "{}",
-                    podcast_data.feed.podcastGuid,
-                ).to_string(),
-            },
-        )),
-        publicKey: PublicKey {
-            id: format!("https://ap.podcastindex.org/podcasts?id={}#main-key", podcast_guid).to_string(),
-            owner: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
-            publicKeyPem: pem_pub_key,
-        },
-        endpoints: Endpoints {
-            sharedInbox: "https://ap.podcastindex.org/inbox?id=0".to_string(),
-        },
-        url: format!("https://podcastindex.org/podcast/{}", podcast_guid).to_string(),
-        manuallyApprovesFollowers: false,
-        indexable: true,
-        memorial: false,
-        published: "2023-11-09T15:56:28.495803Z".to_string(),
-        devices: None,
-        tag: vec!(),
-    };
-
+    let actor_data;
+    match ap_build_actor_object(podcast_data, actor_keys) {
+        Ok(data) => {
+            actor_data = data;
+        }
+        Err(e) => {
+            return hyper::Response::builder()
+                .status(StatusCode::from_u16(500).unwrap())
+                .body(format!("Actor obect error.").into())
+                .unwrap();
+        }
+    }
     let actor_json;
     match serde_json::to_string_pretty(&actor_data) {
         Ok(json_result) => {
@@ -710,13 +642,13 @@ pub async fn outbox(ctx: Context) -> Response {
     let mut paging = false;
     match params.get("page") {
         Some(page) => {
-            println!("Got a page value: {}\n", page);
+            println!("  Got a page value: {}\n", page);
             if page == "true" {
                 paging = true;
             }
         }
         None => {
-            println!("No page param present.");
+            println!("  Non-paged request.");
         }
     }
 
@@ -860,13 +792,127 @@ pub async fn outbox(ctx: Context) -> Response {
 
 pub async fn inbox(ctx: Context) -> Response {
 
+    //Determine HTTP action
+    let http_action = ctx.req.method().to_string();
+
     //Get query parameters
-    // let params: HashMap<String, String> = ctx.req.uri().query().map(|v| {
-    //     url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
-    // }).unwrap_or_else(HashMap::new);
+    let params: HashMap<String, String> = ctx.req.uri().query().map(|v| {
+        url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
+    }).unwrap_or_else(HashMap::new);
 
     println!("\n\n----------");
-    println!("Request: {} from: {:#?}", ctx.req.uri(), ctx.req.headers().get("user-agent"));
+    println!("Request[{}]: {} from: {:#?}", http_action, ctx.req.uri(), ctx.req.headers().get("user-agent"));
+    println!("Context: {:#?}", ctx);
+
+    //Make sure a session param was given
+    let guid;
+    match params.get("id") {
+        Some(resource) => {
+            println!("  Id: {}\n", resource);
+            let parts = resource.replace("acct:", "");
+            guid = parts.split("@").next().unwrap().to_string();
+        }
+        None => {
+            println!("Invalid resource.\n");
+            return hyper::Response::builder()
+                .status(StatusCode::from_u16(400).unwrap())
+                .body(format!("No resource given.").into())
+                .unwrap();
+        }
+    }
+    let podcast_guid = guid.clone();
+
+
+    //Is this a POST?
+    if http_action.to_lowercase() == "post" {
+        //let following_actor;
+        let (parts, body) = ctx.req.into_parts();
+        let body_bytes = hyper::body::to_bytes(body).await.unwrap();
+        let body = std::str::from_utf8(&body_bytes).unwrap();
+
+        println!("{}", body);
+
+        let inbox_request = serde_json::from_str::<InboxRequest>(body);
+        println!("Incoming request: {:#?}", inbox_request);
+        match inbox_request {
+            Ok(incoming_data) => {
+                //TODO: This should all be in separate functions
+                //TODO: If this incoming request is a verb other than follow, a different struct should be used
+                //TODO: ...for decoding, like a Create struct for the object data
+                if incoming_data.r#type.to_lowercase() == "follow" {
+                    let client = reqwest::Client::new();
+                    let response = client
+                        .get(&incoming_data.actor)
+                        .header(reqwest::header::USER_AGENT, "Podcast Index AP/v0.1.2a")
+                        .header(reqwest::header::ACCEPT, "application/activity+json")
+                        .send()
+                        .await;
+                    match response {
+                        Ok(response) => {
+                            match response.text().await {
+                                Ok(response_text) => {
+                                    let actor_data = serde_json::from_str::<Actor>(response_text.as_str());
+                                    println!("{:#?}", actor_data);
+
+                                    //Construct a response
+                                    let accept_data;
+                                    match ap_build_follow_accept(incoming_data, podcast_guid.parse::<u64>().unwrap()) {
+                                        Ok(data) => {
+                                            accept_data = data;
+                                        }
+                                        Err(e) => {
+                                            return hyper::Response::builder()
+                                                .status(StatusCode::from_u16(500).unwrap())
+                                                .body(format!("Accept build error.").into())
+                                                .unwrap();
+                                        }
+                                    }
+                                    let accept_json;
+                                    match serde_json::to_string_pretty(&accept_data) {
+                                        Ok(json_result) => {
+                                            accept_json = json_result;
+                                        }
+                                        Err(e) => {
+                                            println!("Response prep error: [{:#?}].\n", e);
+                                            return hyper::Response::builder()
+                                                .status(StatusCode::from_u16(500).unwrap())
+                                                .body(format!("Accept encode error.").into())
+                                                .unwrap();
+                                        }
+                                    }
+
+                                    //Send the accept request to the follower inbox url
+                                    //TODO
+                                }
+                                Err(e) => {
+                                    println!("Bad actor.\n");
+                                    return hyper::Response::builder()
+                                        .status(StatusCode::from_u16(400).unwrap())
+                                        .body(format!("Bad actor.").into())
+                                        .unwrap();
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            println!("Bad actor.\n");
+                            return hyper::Response::builder()
+                                .status(StatusCode::from_u16(400).unwrap())
+                                .body(format!("Bad actor.").into())
+                                .unwrap();
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                println!("Invalid request.\n");
+                return hyper::Response::builder()
+                    .status(StatusCode::from_u16(400).unwrap())
+                    .body(format!("Invalid request.").into())
+                    .unwrap();
+            }
+        }
+    }
+
 
     // //Make sure a session param was given
     // let guid;
@@ -1184,12 +1230,12 @@ pub async fn api_get_podcast(key: &'static str, secret: &'static str, query: &st
     //##: The auth token is built by creating an sha1 hash of the key, secret and current time (as a string)
     //##: concatenated together. The hash is a lowercase string.
     let data4hash: String = format!("{}{}{}", api_key, api_secret, api_time);
-    println!("Data to hash: [{}]", data4hash);
+    //println!("Data to hash: [{}]", data4hash);
     let mut hasher = Sha1::new();
     hasher.update(data4hash);
     let authorization_token = hasher.finalize();
     let api_hash: String = format!("{:X}", authorization_token).to_lowercase();
-    println!("Hash String: [{}]", api_hash);
+    //println!("Hash String: [{}]", api_hash);
 
     //##: Set up the parameters and the api endpoint url to call and make sure all params are
     //##: url encoded before sending.
@@ -1207,11 +1253,11 @@ pub async fn api_get_podcast(key: &'static str, secret: &'static str, query: &st
     let res = client.get(url.as_str()).send();
     match res.await {
         Ok(res) => {
-            println!("Response Status: [{}]", res.status());
+            println!("  Response: [{}]", res.status());
             return Ok(res.text().await.unwrap());
         }
         Err(e) => {
-            eprintln!("API response error: [{}]", e);
+            eprintln!("  Error: [{}]", e);
             return Err(Box::new(HydraError(format!("Error running SQL query: [{}]", e).into())));
         }
     }
@@ -1232,12 +1278,12 @@ pub async fn api_get_episodes(key: &'static str, secret: &'static str, query: &s
     //##: The auth token is built by creating an sha1 hash of the key, secret and current time (as a string)
     //##: concatenated together. The hash is a lowercase string.
     let data4hash: String = format!("{}{}{}", api_key, api_secret, api_time);
-    println!("Data to hash: [{}]", data4hash);
+    //println!("Data to hash: [{}]", data4hash);
     let mut hasher = Sha1::new();
     hasher.update(data4hash);
     let authorization_token = hasher.finalize();
     let api_hash: String = format!("{:X}", authorization_token).to_lowercase();
-    println!("Hash String: [{}]", api_hash);
+    //println!("Hash String: [{}]", api_hash);
 
     //##: Set up the parameters and the api endpoint url to call and make sure all params are
     //##: url encoded before sending.
@@ -1255,15 +1301,203 @@ pub async fn api_get_episodes(key: &'static str, secret: &'static str, query: &s
     let res = client.get(url.as_str()).send();
     match res.await {
         Ok(res) => {
-            println!("Response Status: [{}]", res.status());
+            println!("  Response: [{}]", res.status());
             return Ok(res.text().await.unwrap());
         }
         Err(e) => {
-            eprintln!("API response error: [{}]", e);
+            eprintln!("  Error: [{}]", e);
             return Err(Box::new(HydraError(format!("Error running SQL query: [{}]", e).into())));
         }
     }
 }
+
+
+//ActivityPub helper functions -------------------------------------------------------------------------------
+fn ap_build_actor_object(podcast_data: PIPodcast, actor_keys: ActorKeys) -> Result<Actor, Box<dyn Error>> {
+    let podcast_guid = podcast_data.feed.id;
+
+    return Ok(Actor {
+        at_context: vec!(
+            "https://www.w3.org/ns/activitystreams".to_string(),
+            "https://w3id.org/security/v1".to_string(),
+        ),
+        id: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
+        r#type: "Person".to_string(),
+        discoverable: true,
+        preferredUsername: podcast_guid.to_string(),
+        name: format!("{:.48}", podcast_data.feed.title).to_string(),
+        inbox: format!("https://ap.podcastindex.org/inbox?id={}", podcast_guid).to_string(),
+        outbox: format!("https://ap.podcastindex.org/outbox?id={}", podcast_guid).to_string(),
+        featured: format!("https://ap.podcastindex.org/featured?id={}", podcast_guid).to_string(),
+        followers: format!("https://ap.podcastindex.org/followers?id={}", podcast_guid).to_string(),
+        following: format!("https://ap.podcastindex.org/following?id={}", podcast_guid).to_string(),
+        icon: Icon {
+            r#type: "Image".to_string(),
+            url: format!("{}", podcast_data.feed.image).to_string(),
+        },
+        summary: format!("{:.96}", podcast_data.feed.description),
+        attachment: Some(vec!(
+            Attachment {
+                name: "Index".to_string(),
+                r#type: "PropertyValue".to_string(),
+                value: format!(
+                    "<a href='https://podcastindex.org/podcast/{}' rel='ugc'>https://podcastindex.org/podcast/{}</a>",
+                    podcast_guid,
+                    podcast_guid,
+                ).to_string(),
+            },
+            Attachment {
+                name: "Website".to_string(),
+                r#type: "PropertyValue".to_string(),
+                value: format!(
+                    "<a href='{}' rel='ugc'>{}</a>",
+                    podcast_data.feed.link,
+                    podcast_data.feed.link,
+                ).to_string(),
+            },
+            Attachment {
+                name: "Podcast Guid".to_string(),
+                r#type: "PropertyValue".to_string(),
+                value: format!(
+                    "{}",
+                    podcast_data.feed.podcastGuid,
+                ).to_string(),
+            },
+        )),
+        publicKey: PublicKey {
+            id: format!("https://ap.podcastindex.org/podcasts?id={}#main-key", podcast_guid).to_string(),
+            owner: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
+            publicKeyPem: actor_keys.pem_public_key,
+        },
+        endpoints: Endpoints {
+            sharedInbox: "https://ap.podcastindex.org/inbox?id=0".to_string(),
+        },
+        url: format!("https://podcastindex.org/podcast/{}", podcast_guid).to_string(),
+        manuallyApprovesFollowers: false,
+        indexable: true,
+        memorial: false,
+        published: "2023-11-09T15:56:28.495803Z".to_string(),
+        devices: None,
+        tag: vec!(),
+    });
+}
+fn ap_build_follow_accept(follow_request: InboxRequest, podcast_guid: u64) -> Result<InboxRequestAccept, Box<dyn Error>> {
+
+    return Ok(
+        InboxRequestAccept {
+            at_context: "https://www.w3.org/ns/activitystreams".to_string(),
+            id: format!("https://ap.podcastindex.org/podcasts?id={}&context=accept", podcast_guid).to_string(),
+            r#type: "Accept".to_string(),
+            actor: follow_request.object.clone(),
+            object: follow_request,
+        }
+    );
+}
+fn ap_get_actor_keys(podcast_guid: u64) -> Result<ActorKeys, Box<dyn Error>> {
+
+    let actor_keys;
+    let pem_pub_key;
+    let pem_priv_key;
+    match dbif::get_actor_from_db(&"ap.db".to_string(), podcast_guid) {
+        Ok(actor_record) => {
+            pem_pub_key = actor_record.pem_public_key;
+            pem_priv_key = actor_record.pem_private_key;
+
+            actor_keys = ActorKeys {
+                pem_private_key: pem_priv_key.clone(),
+                pem_public_key: pem_pub_key.clone(),
+            }
+        }
+        Err(_) => {
+            //TODO: wip
+            let priv_key;
+            let pub_key;
+            {
+                let mut rng = rand::thread_rng();
+                let bits = 2048;
+                priv_key = RsaPrivateKey::new(&mut rng, bits).expect("failed to generate key");
+                pub_key = RsaPublicKey::from(&priv_key);
+            }
+            match pkcs1::EncodeRsaPrivateKey::to_pkcs1_pem(&priv_key, pkcs1::LineEnding::LF) {
+                Ok(pem_encoded_privkey) => {
+                    pem_priv_key = pem_encoded_privkey.to_string();
+                }
+                Err(e) => {
+                    return Err(Box::new(HydraError(format!("Error encoding private key: [{}]", e).into())));
+                }
+            }
+            println!("Private key: {:.40}", pem_priv_key);
+            match pkcs1::EncodeRsaPublicKey::to_pkcs1_pem(&pub_key, pkcs1::LineEnding::LF) {
+                Ok(pem_encoded_pubkey) => {
+                    pem_pub_key = pem_encoded_pubkey.to_string();
+                }
+                Err(e) => {
+                    return Err(Box::new(HydraError(format!("Error encoding public key: [{}]", e).into())));
+                }
+            }
+            println!("Public key: {:.40}", pem_pub_key);
+
+            let _ = dbif::add_actor_to_db(&"ap.db".to_string(), ActorRecord {
+                pcid: podcast_guid,
+                guid: "".to_string(),
+                pem_private_key: pem_priv_key.clone(),
+                pem_public_key: pem_pub_key.clone(),
+            });
+
+            actor_keys = ActorKeys {
+                pem_private_key: pem_priv_key.clone(),
+                pem_public_key: pem_pub_key.clone(),
+            }
+        }
+    }
+
+    return Ok(actor_keys);
+}
+// pub async fn ap_send_follow_accept(actor_keys: ActorKeys, inbox_accept: InboxRequestAccept, inbox_url: String) -> Result<String, Box<dyn Error>> {
+//     println!("  AP Accepting Follow request from: {}", inbox_accept.object.actor);
+//
+//     //##: ======== Required values ========
+//     //##: WARNING: don't publish these to public repositories or in public places!
+//     //##: NOTE: values below are sample values, to get your own values go to https://api.podcastindex.org
+//     let api_time = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time mismatch.").as_secs().to_string();
+//
+//     //##: Create the authorization token.
+//     //##: The auth token is built by creating an sha1 hash of the key, secret and current time (as a string)
+//     //##: concatenated together. The hash is a lowercase string.
+//     let data4hash: String = format!("{}{}{}", api_key, api_secret, api_time);
+//     //println!("Data to hash: [{}]", data4hash);
+//     let mut hasher = Sha1::new();
+//     hasher.update(data4hash);
+//     let authorization_token = hasher.finalize();
+//     let api_hash: String = format!("{:X}", authorization_token).to_lowercase();
+//     //println!("Hash String: [{}]", api_hash);
+//
+//     //##: The url to send to must be the follower actors inbox url
+//     let url: String = format!("{}", urlencoding::encode(&inbox_url));
+//
+//     //##: Build the query with the required headers
+//     let mut headers = header::HeaderMap::new();
+//     headers.insert("User-Agent", header::HeaderValue::from_static("Podcast Index AP/v0.1.2a"));
+//     headers.insert("Accept", header::HeaderValue::from_static("application/activity+json"));
+//     headers.insert("X-Auth-Date", header::HeaderValue::from_str(api_time.as_str()).unwrap());
+//     headers.insert("X-Auth-Key", header::HeaderValue::from_static(api_key));
+//     headers.insert("Authorization", header::HeaderValue::from_str(api_hash.as_str()).unwrap());
+//     let client = reqwest::Client::builder().default_headers(headers).build().unwrap();
+//
+//     //##: Send the request and display the results or the error
+//     let res = client.get(url.as_str()).send();
+//     match res.await {
+//         Ok(res) => {
+//             println!("  Response: [{}]", res.status());
+//             return Ok(res.text().await.unwrap());
+//         }
+//         Err(e) => {
+//             eprintln!("  Error: [{}]", e);
+//             return Err(Box::new(HydraError(format!("Error running SQL query: [{}]", e).into())));
+//         }
+//     }
+// }
+
 
 
 //Utilities --------------------------------------------------------------------------------------------------
