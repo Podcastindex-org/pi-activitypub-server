@@ -91,6 +91,7 @@ pub struct Actor {
     id: String,
     r#type: String,
     discoverable: bool,
+    #[serde(skip_deserializing)]
     indexable: bool,
     preferredUsername: String,
     published: String,
