@@ -8,11 +8,17 @@ use serde::{Deserialize, Serialize};
 //use serde_json::{Value};
 use std::time::{SystemTime, UNIX_EPOCH};
 use sha1::{Sha1, Digest};
+use sha2::{Sha256};
 use urlencoding;
 use reqwest::header;
 use chrono::{TimeZone, Utc};
 use rsa::{RsaPrivateKey, RsaPublicKey};
 use dbif::{ActorRecord};
+use base64::{Engine as _, engine::{self, general_purpose}, alphabet};
+use secp256k1::hashes::{sha256, Hash};
+use secp256k1::Message;
+use sigh::{Key, PrivateKey, SigningConfig};
+use sigh::alg::RsaSha256;
 
 
 //Globals ----------------------------------------------------------------------------------------------------
@@ -24,7 +30,7 @@ const API_SECRET: &str = "J3v9m$4b6NCD9ENV4QEKYb^DnWdcGR$^Gq7#5uwS";
 //Structs ----------------------------------------------------------------------------------------------------
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
-struct Link {
+pub struct Link {
     rel: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     r#type: Option<String>,
@@ -35,7 +41,7 @@ struct Link {
 }
 
 #[derive(Serialize, Deserialize)]
-struct Webfinger {
+pub struct Webfinger {
     subject: String,
     aliases: Vec<String>,
     links: Vec<Link>,
@@ -43,7 +49,7 @@ struct Webfinger {
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug)]
-struct PublicKey {
+pub struct PublicKey {
     id: String,
     owner: String,
     publicKeyPem: String,
@@ -51,14 +57,14 @@ struct PublicKey {
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug)]
-struct Icon {
+pub struct Icon {
     r#type: String,
     url: String,
 }
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug)]
-struct Attachment {
+pub struct Attachment {
     name: String,
     r#type: String,
     value: String,
@@ -66,20 +72,20 @@ struct Attachment {
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug)]
-struct Endpoints {
+pub struct Endpoints {
     sharedInbox: String,
 }
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug)]
-struct ActorKeys {
+pub struct ActorKeys {
     pem_private_key: String,
     pem_public_key: String,
 }
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug)]
-struct Actor {
+pub struct Actor {
     #[serde(rename = "@context", skip_deserializing)]
     at_context: Vec<String>,
     id: String,
@@ -109,7 +115,7 @@ struct Actor {
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug)]
-struct InboxRequest {
+pub struct InboxRequest {
     id: String,
     r#type: String,
     actor: String,
@@ -118,7 +124,7 @@ struct InboxRequest {
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug)]
-struct InboxRequestAccept {
+pub struct InboxRequestAccept {
     #[serde(rename = "@context", skip_deserializing)]
     at_context: String,
     id: String,
@@ -129,7 +135,7 @@ struct InboxRequestAccept {
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
-struct OutboxConfig {
+pub struct OutboxConfig {
     #[serde(rename = "@context")]
     context: String,
     id: String,
@@ -141,7 +147,7 @@ struct OutboxConfig {
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
-struct Object {
+pub struct Object {
     id: String,
     r#type: String,
     summary: Option<String>,
@@ -159,7 +165,7 @@ struct Object {
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
-struct Item {
+pub struct Item {
     id: String,
     r#type: String,
     actor: String,
@@ -171,7 +177,7 @@ struct Item {
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
-struct OutboxPaged {
+pub struct OutboxPaged {
     #[serde(rename = "@context")]
     context: String,
     id: String,
@@ -186,7 +192,7 @@ struct OutboxPaged {
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
-struct Featured {
+pub struct Featured {
     #[serde(rename = "@context")]
     at_context: Vec<String>,
     id: String,
@@ -198,7 +204,7 @@ struct Featured {
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
-struct FeaturedItem {
+pub struct FeaturedItem {
     #[serde(rename = "@context")]
     at_context: Vec<String>,
     actor: String,
@@ -221,7 +227,7 @@ struct FeaturedItem {
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
-struct Status {
+pub struct Status {
     #[serde(rename = "@context")]
     at_context: Vec<String>,
     id: String,
@@ -239,12 +245,12 @@ struct Status {
     attachment: Vec<String>,
     actor: String,
     tag: Vec<String>,
-    replies: Option<String>,    //TODO: This should refer to some sort of Collection struct
+    replies: Option<String>,    //TODO: This should refer to some sort of Collection pub struct
 }
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
-struct PIFeed {
+pub struct PIFeed {
     id: u64,
     podcastGuid: String,
     medium: String,
@@ -262,14 +268,14 @@ struct PIFeed {
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
-struct PIPodcast {
+pub struct PIPodcast {
     status: String,
     feed: PIFeed,
 }
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
-struct PIItem {
+pub struct PIItem {
     id: u64,
     title: String,
     link: String,
@@ -286,14 +292,14 @@ struct PIItem {
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
-struct PIEpisodes {
+pub struct PIEpisodes {
     status: String,
     items: Vec<PIItem>,
     count: u64,
 }
 
 #[derive(Debug)]
-struct HydraError(String);
+pub struct HydraError(String);
 
 impl fmt::Display for HydraError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -851,8 +857,8 @@ pub async fn inbox(ctx: Context) -> Response {
                         Ok(response) => {
                             match response.text().await {
                                 Ok(response_text) => {
-                                    let actor_data = serde_json::from_str::<Actor>(response_text.as_str());
-                                    println!("{:#?}", actor_data);
+                                    let actor_data = serde_json::from_str::<Actor>(response_text.as_str()).unwrap();
+                                    //println!("{:#?}", actor_data);
 
                                     //Construct a response
                                     let accept_data;
@@ -883,6 +889,12 @@ pub async fn inbox(ctx: Context) -> Response {
 
                                     //Send the accept request to the follower inbox url
                                     //TODO
+                                    ap_send_follow_accept(
+                                        ap_get_actor_keys(podcast_guid.parse::<u64>().unwrap()).unwrap(),
+                                         accept_data,
+                                        actor_data.inbox,
+                                        podcast_guid.parse::<u64>().unwrap()
+                                    );
                                 }
                                 Err(e) => {
                                     println!("Bad actor.\n");
@@ -1453,50 +1465,121 @@ fn ap_get_actor_keys(podcast_guid: u64) -> Result<ActorKeys, Box<dyn Error>> {
 
     return Ok(actor_keys);
 }
-// pub async fn ap_send_follow_accept(actor_keys: ActorKeys, inbox_accept: InboxRequestAccept, inbox_url: String) -> Result<String, Box<dyn Error>> {
-//     println!("  AP Accepting Follow request from: {}", inbox_accept.object.actor);
-//
-//     //##: ======== Required values ========
-//     //##: WARNING: don't publish these to public repositories or in public places!
-//     //##: NOTE: values below are sample values, to get your own values go to https://api.podcastindex.org
-//     let api_time = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time mismatch.").as_secs().to_string();
-//
-//     //##: Create the authorization token.
-//     //##: The auth token is built by creating an sha1 hash of the key, secret and current time (as a string)
-//     //##: concatenated together. The hash is a lowercase string.
-//     let data4hash: String = format!("{}{}{}", api_key, api_secret, api_time);
-//     //println!("Data to hash: [{}]", data4hash);
-//     let mut hasher = Sha1::new();
-//     hasher.update(data4hash);
-//     let authorization_token = hasher.finalize();
-//     let api_hash: String = format!("{:X}", authorization_token).to_lowercase();
-//     //println!("Hash String: [{}]", api_hash);
-//
-//     //##: The url to send to must be the follower actors inbox url
-//     let url: String = format!("{}", urlencoding::encode(&inbox_url));
-//
-//     //##: Build the query with the required headers
-//     let mut headers = header::HeaderMap::new();
-//     headers.insert("User-Agent", header::HeaderValue::from_static("Podcast Index AP/v0.1.2a"));
-//     headers.insert("Accept", header::HeaderValue::from_static("application/activity+json"));
-//     headers.insert("X-Auth-Date", header::HeaderValue::from_str(api_time.as_str()).unwrap());
-//     headers.insert("X-Auth-Key", header::HeaderValue::from_static(api_key));
-//     headers.insert("Authorization", header::HeaderValue::from_str(api_hash.as_str()).unwrap());
-//     let client = reqwest::Client::builder().default_headers(headers).build().unwrap();
-//
-//     //##: Send the request and display the results or the error
-//     let res = client.get(url.as_str()).send();
-//     match res.await {
-//         Ok(res) => {
-//             println!("  Response: [{}]", res.status());
-//             return Ok(res.text().await.unwrap());
-//         }
-//         Err(e) => {
-//             eprintln!("  Error: [{}]", e);
-//             return Err(Box::new(HydraError(format!("Error running SQL query: [{}]", e).into())));
-//         }
-//     }
-// }
+pub async fn ap_send_follow_accept(actor_keys: ActorKeys, inbox_accept: InboxRequestAccept, inbox_url: String, podcast_guid: u64) -> Result<String, Box<dyn Error>> {
+    println!("  AP Accepting Follow request from: {}", inbox_accept.object.actor);
+
+    //##: Decode the private key
+    let private_key = sigh::PrivateKey::from_pem(actor_keys.pem_private_key.as_bytes()).unwrap();
+
+    //Construct the POST body
+    let post_body;
+    match serde_json::to_string_pretty(&inbox_accept) {
+        Ok(json_result) => {
+            post_body = json_result;
+        }
+        Err(e) => {
+            return Err(Box::new(HydraError(format!("Error building post body: [{}]", e).into())));
+        }
+    }
+    
+    //##: ======== Required values ========
+    //##: WARNING: don't publish these to public repositories or in public places!
+    //##: NOTE: values below are sample values, to get your own values go to https://api.podcastindex.org
+    let headers_to_hash = "(request-target) host date digest";
+    let hash_algorithm = "rsa-sha256";
+    let header_date = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time mismatch.").as_secs().to_string();
+    let url_parts = url::Url::parse(inbox_url.as_str());
+    match url_parts {
+        Ok(_) => {}
+        Err(e) => {
+            return Err(Box::new(HydraError(format!("Invalid inbox url: [{}]", e).into())));
+        }
+    }
+    let parts = url_parts.unwrap();
+    let header_host = parts.host_str().unwrap();
+    let header_path = parts.path();
+    let mut hasher = Sha256::new();
+    hasher.update(post_body);
+    let digest_hash = hasher.finalize();
+    let digest_string = general_purpose::STANDARD.encode(digest_hash);
+    println!("{}", digest_string);
+
+    //##: Create the authorization token.
+    //##: The auth token is built by creating an sha1 hash of the key, secret and current time (as a string)
+    //##: concatenated together. The hash is a lowercase string.
+    let headers_for_hashing: String = format!(
+        "(request-target): post {}\nhost: {}\ndate: {}\ndigest: sha-256={}",
+        header_path,
+        header_host,
+        header_date,
+        digest_string
+    );
+    //println!("Data to hash: [{}]", data4hash);
+    let mut hasher = Sha256::new();
+    hasher.update(headers_for_hashing);
+    let signature_string = hasher.finalize();
+    println!("Signature string: [{:x}]", signature_string);
+
+    //##: The url to send to must be the follower actors inbox url
+    let url = format!("{}", urlencoding::encode(&inbox_url));
+
+    //##: Calculate the signature
+    let request_signature = format!(
+        "keyId=\"https://ap.podcastindex.org/podcasts?id={}#main-key\",algorithm=\"{}\",headers=\"{}\",signature=\"{:x}\"",
+        podcast_guid,
+        hash_algorithm,
+        headers_to_hash,
+        signature_string
+    );
+    let signature_header = request_signature.clone();
+    let signature_header_string = signature_header.as_str();
+
+    //##: Build the query with the required headers
+    let mut headers = header::HeaderMap::new();
+    headers.insert("User-Agent", header::HeaderValue::from_static("Podcast Index AP/v0.1.2a"));
+    headers.insert("Accept", header::HeaderValue::from_static("application/activity+json"));
+    headers.insert("Content-type", header::HeaderValue::from_static("application/json"));
+    let client = reqwest::Client::builder()
+        .default_headers(headers)
+        .build()
+        .unwrap();
+
+    //##: Send the request and display the results or the error
+    //let mut request = client.post(url.as_str()).body(post_body).build().unwrap();
+    // let mut request = http::Request::builder()
+    //     .method("POST")
+    //     .uri(url.as_str())
+    //     .header("User-Agent", "Podcast Index AP/v0.1.2a")
+    //     .header("Accept", "application/activity+json")
+    //     .header("Content-type", "application/json")
+    //     .body(post_body)
+    //     .unwrap();
+    // //Sign the request
+    // // SigningConfig::new(
+    // //     RsaSha256,
+    // //     &private_key,
+    // //     format!("https://ap.podcastindex.org/podcasts?id={}#main-key", podcast_guid).to_string()
+    // // ).sign(&mut request);
+    // sign_request(&mut request, &actor_keys.pem_private_key.as_bytes());
+
+    //println!("{:#?}", request.into_parts());
+
+    //Send the request
+    let res = client.post(url.as_str()).send();
+    match res.await {
+        Ok(res) => {
+            println!("  Response: [{}]", res.status());
+            return Ok(res.text().await.unwrap());
+        }
+        Err(e) => {
+            eprintln!("  Error: [{}]", e);
+            return Err(Box::new(HydraError(format!("Error sending follow accept request: [{}]", e).into())));
+        }
+    }
+
+    // return Ok("".to_string());
+
+}
 
 
 
@@ -1509,6 +1592,12 @@ fn iso8601(utime: u64) -> String {
     // Formats the combined date and time with the specified format string.
     datetime.format("%+").to_string()
 }
+
+// fn sign_request<B>(request: &mut http::Request<B>, private_key_pem: &[u8]) -> Result<(), sigh::Error> {
+//     let private_key = PrivateKey::from_pem(private_key_pem)?;
+//     SigningConfig::new(RsaSha256, &private_key, "my-key-id")
+//         .sign(request)
+// }
 
 // fn get_sys_time_in_secs() -> u64 {
 //     match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
