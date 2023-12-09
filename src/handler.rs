@@ -59,7 +59,18 @@ pub struct PublicKey {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Icon {
     r#type: String,
+    mediaType: Option<String>,
     url: String,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TagObject {
+    id: String,
+    r#type: String,
+    name: Option<String>,
+    updated: Option<String>,
+    icon: Option<Icon>,
 }
 
 #[allow(non_snake_case)]
@@ -91,11 +102,10 @@ pub struct Actor {
     id: String,
     r#type: String,
     discoverable: bool,
-    #[serde(skip_deserializing)]
-    indexable: bool,
+    indexable: Option<bool>,
     preferredUsername: String,
     published: String,
-    memorial: bool,
+    memorial: Option<bool>,
     devices: Option<String>,
     tag: Vec<String>,
     name: String,
@@ -847,6 +857,7 @@ pub async fn inbox(ctx: Context) -> Response {
                 //TODO: If this incoming request is a verb other than follow, a different struct should be used
                 //TODO: ...for decoding, like a Create struct for the object data
                 if incoming_data.r#type.to_lowercase() == "follow" {
+                    println!("--Follow request");
                     let client = reqwest::Client::new();
                     let response = client
                         .get(&incoming_data.actor)
@@ -1346,6 +1357,7 @@ fn ap_build_actor_object(podcast_data: PIPodcast, actor_keys: ActorKeys) -> Resu
         following: format!("https://ap.podcastindex.org/following?id={}", podcast_guid).to_string(),
         icon: Icon {
             r#type: "Image".to_string(),
+            mediaType: None,
             url: format!("{}", podcast_data.feed.image).to_string(),
         },
         summary: format!("{:.96}", podcast_data.feed.description),
@@ -1387,13 +1399,14 @@ fn ap_build_actor_object(podcast_data: PIPodcast, actor_keys: ActorKeys) -> Resu
         },
         url: format!("https://podcastindex.org/podcast/{}", podcast_guid).to_string(),
         manuallyApprovesFollowers: false,
-        indexable: true,
-        memorial: false,
+        indexable: Some(true),
+        memorial: Some(false),
         published: "2023-11-09T15:56:28.495803Z".to_string(),
         devices: None,
         tag: vec!(),
     });
 }
+
 fn ap_build_follow_accept(follow_request: InboxRequest, podcast_guid: u64) -> Result<InboxRequestAccept, Box<dyn Error>> {
 
     return Ok(
@@ -1406,6 +1419,7 @@ fn ap_build_follow_accept(follow_request: InboxRequest, podcast_guid: u64) -> Re
         }
     );
 }
+
 fn ap_get_actor_keys(podcast_guid: u64) -> Result<ActorKeys, Box<dyn Error>> {
 
     let actor_keys;
@@ -1466,6 +1480,7 @@ fn ap_get_actor_keys(podcast_guid: u64) -> Result<ActorKeys, Box<dyn Error>> {
 
     return Ok(actor_keys);
 }
+
 pub async fn ap_send_follow_accept(actor_keys: ActorKeys, inbox_accept: InboxRequestAccept, inbox_url: String, podcast_guid: u64) -> Result<String, Box<dyn Error>> {
     println!("  AP Accepting Follow request from: {}", inbox_accept.object.actor);
 
