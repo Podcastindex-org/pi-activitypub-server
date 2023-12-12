@@ -114,7 +114,7 @@ pub struct Actor {
     featured: String,
     followers: String,
     following: String,
-    icon: Icon,
+    icon: Option<Icon>,
     summary: String,
     url: String,
     manuallyApprovesFollowers: bool,
@@ -873,6 +873,7 @@ pub async fn inbox(ctx: Context) -> Response {
                                     //println!("{:#?}", actor_data);
 
                                     //Construct a response
+                                    println!("  Building follow accept json.");
                                     let accept_data;
                                     match ap_build_follow_accept(incoming_data, podcast_guid.parse::<u64>().unwrap()) {
                                         Ok(data) => {
@@ -901,6 +902,7 @@ pub async fn inbox(ctx: Context) -> Response {
 
                                     //Send the accept request to the follower inbox url
                                     //TODO
+                                    println!("  Send the follow accept request.");
                                     ap_send_follow_accept(
                                         ap_get_actor_keys(podcast_guid.parse::<u64>().unwrap()).unwrap(),
                                          accept_data,
@@ -1355,11 +1357,11 @@ fn ap_build_actor_object(podcast_data: PIPodcast, actor_keys: ActorKeys) -> Resu
         featured: format!("https://ap.podcastindex.org/featured?id={}", podcast_guid).to_string(),
         followers: format!("https://ap.podcastindex.org/followers?id={}", podcast_guid).to_string(),
         following: format!("https://ap.podcastindex.org/following?id={}", podcast_guid).to_string(),
-        icon: Icon {
+        icon: Some(Icon {
             r#type: "Image".to_string(),
             mediaType: None,
             url: format!("{}", podcast_data.feed.image).to_string(),
-        },
+        }),
         summary: format!("{:.96}", podcast_data.feed.description),
         attachment: Some(vec!(
             Attachment {
@@ -1422,6 +1424,8 @@ fn ap_build_follow_accept(follow_request: InboxRequest, podcast_guid: u64) -> Re
 
 fn ap_get_actor_keys(podcast_guid: u64) -> Result<ActorKeys, Box<dyn Error>> {
 
+    println!("Getting actor keys for: [{}]", podcast_guid);
+
     let actor_keys;
     let pem_pub_key;
     let pem_priv_key;
@@ -1435,7 +1439,9 @@ fn ap_get_actor_keys(podcast_guid: u64) -> Result<ActorKeys, Box<dyn Error>> {
                 pem_public_key: pem_pub_key.clone(),
             }
         }
-        Err(_) => {
+        Err(e) => {
+            eprintln!("get_actor_from_db error: [{:#?}]", e);
+
             //TODO: wip
             let priv_key;
             let pub_key;
@@ -1470,6 +1476,7 @@ fn ap_get_actor_keys(podcast_guid: u64) -> Result<ActorKeys, Box<dyn Error>> {
                 pem_private_key: pem_priv_key.clone(),
                 pem_public_key: pem_pub_key.clone(),
             });
+            println!("Saved actor to DB");
 
             actor_keys = ActorKeys {
                 pem_private_key: pem_priv_key.clone(),
@@ -1497,6 +1504,7 @@ pub async fn ap_send_follow_accept(actor_keys: ActorKeys, inbox_accept: InboxReq
             return Err(Box::new(HydraError(format!("Error building post body: [{}]", e).into())));
         }
     }
+    println!("  SIG - POST BODY: {}", post_body);
     
     //##: ======== Required values ========
     //##: WARNING: don't publish these to public repositories or in public places!

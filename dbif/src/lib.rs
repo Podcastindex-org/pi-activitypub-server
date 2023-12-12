@@ -238,7 +238,7 @@ pub fn get_actor_from_db(filepath: &String, pcid: u64) -> Result<ActorRecord, Bo
                                     pcid, \
                                     guid,\
                                     pem_private_key, \
-                                    pem_public_key, \
+                                    pem_public_key \
                                  FROM actors \
                                  WHERE pcid = :pcid \
                                  ORDER BY pcid DESC \
