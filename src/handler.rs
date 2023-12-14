@@ -900,15 +900,14 @@ pub async fn inbox(ctx: Context) -> Response {
                                         }
                                     }
 
-                                    //Send the accept request to the follower inbox url
-                                    //TODO
+                                    //##: Send the accept request to the follower inbox url
                                     println!("  Send the follow accept request.");
                                     ap_send_follow_accept(
-                                        ap_get_actor_keys(podcast_guid.parse::<u64>().unwrap()).unwrap(),
-                                         accept_data,
-                                        actor_data.inbox,
-                                        podcast_guid.parse::<u64>().unwrap()
-                                    );
+                                        podcast_guid.parse::<u64>().unwrap(),
+                                        accept_data,
+                                        actor_data.inbox
+                                    ).await;
+
                                 }
                                 Err(e) => {
                                     println!("Bad actor.\n");
@@ -1424,7 +1423,7 @@ fn ap_build_follow_accept(follow_request: InboxRequest, podcast_guid: u64) -> Re
 
 fn ap_get_actor_keys(podcast_guid: u64) -> Result<ActorKeys, Box<dyn Error>> {
 
-    println!("Getting actor keys for: [{}]", podcast_guid);
+    println!("  Getting actor keys for: [{}]", podcast_guid);
 
     let actor_keys;
     let pem_pub_key;
@@ -1488,8 +1487,11 @@ fn ap_get_actor_keys(podcast_guid: u64) -> Result<ActorKeys, Box<dyn Error>> {
     return Ok(actor_keys);
 }
 
-pub async fn ap_send_follow_accept(actor_keys: ActorKeys, inbox_accept: InboxRequestAccept, inbox_url: String, podcast_guid: u64) -> Result<String, Box<dyn Error>> {
+pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequestAccept, inbox_url: String) -> Result<String, Box<dyn Error>> {
     println!("  AP Accepting Follow request from: {}", inbox_accept.object.actor);
+
+    //##: Get actor keys for guid
+    let actor_keys = ap_get_actor_keys(podcast_guid).unwrap();
 
     //##: Decode the private key
     let private_key = sigh::PrivateKey::from_pem(actor_keys.pem_private_key.as_bytes()).unwrap();
@@ -1589,7 +1591,8 @@ pub async fn ap_send_follow_accept(actor_keys: ActorKeys, inbox_accept: InboxReq
     //println!("{:#?}", request.into_parts());
 
     //Send the request
-    let res = client.post(url.as_str()).send();
+    println!("  URL: [{}]", inbox_url.as_str());
+    let res = client.post(inbox_url.as_str()).send();
     match res.await {
         Ok(res) => {
             println!("  Response: [{}]", res.status());
