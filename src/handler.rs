@@ -1527,8 +1527,8 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
     let mut hasher = Sha256::new();
     hasher.update(post_body);
     let digest_hash = hasher.finalize();
-    let digest_string = general_purpose::STANDARD.encode(digest_hash);
-    println!("{}", digest_string);
+    let digest_string = format!("sha-256={}",general_purpose::STANDARD.encode(digest_hash));
+    println!("Digest string: [{:#?}]", digest_string);
 
     //##: Create the authorization token.
     //##: The auth token is built by creating an sha1 hash of the key, secret and current time (as a string)
@@ -1559,12 +1559,17 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
     );
     let signature_header = request_signature.clone();
     let signature_header_string = signature_header.as_str();
+    println!("Signature header value: [{:#?}]", request_signature);
 
     //##: Build the query with the required headers
     let mut headers = header::HeaderMap::new();
     headers.insert("User-Agent", header::HeaderValue::from_static("Podcast Index AP/v0.1.2a"));
     headers.insert("Accept", header::HeaderValue::from_static("application/activity+json"));
     headers.insert("Content-type", header::HeaderValue::from_static("application/json"));
+    headers.insert("Host", header::HeaderValue::from_str(header_host).unwrap());
+    headers.insert("Date", header::HeaderValue::from_str(header_date.as_str()).unwrap());
+    headers.insert("Digest", header::HeaderValue::from_str(digest_string.as_str()).unwrap());
+    headers.insert("Signature", header::HeaderValue::from_str(request_signature.as_str()).unwrap());
     let client = reqwest::Client::builder()
         .default_headers(headers)
         .build()
