@@ -1514,6 +1514,7 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
     let headers_to_hash = "(request-target) host date digest";
     let hash_algorithm = "rsa-sha256";
     let header_date = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time mismatch.").as_secs().to_string();
+    let header_date_imf = httpdate::fmt_http_date(SystemTime::now());
     let url_parts = url::Url::parse(inbox_url.as_str());
     match url_parts {
         Ok(_) => {}
@@ -1562,12 +1563,13 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
     println!("Signature header value: [{:#?}]", request_signature);
 
     //##: Build the query with the required headers
+    //##: TODO test by sending this to the ladder webhook
     let mut headers = header::HeaderMap::new();
     headers.insert("User-Agent", header::HeaderValue::from_static("Podcast Index AP/v0.1.2a"));
     headers.insert("Accept", header::HeaderValue::from_static("application/activity+json"));
     headers.insert("Content-type", header::HeaderValue::from_static("application/json"));
-    headers.insert("Host", header::HeaderValue::from_str(header_host).unwrap());
-    headers.insert("Date", header::HeaderValue::from_str(header_date.as_str()).unwrap());
+    //headers.insert("Host", header::HeaderValue::from_str(header_host).unwrap());
+    headers.insert("Date", header::HeaderValue::from_str(header_date_imf.as_str()).unwrap());
     headers.insert("Digest", header::HeaderValue::from_str(digest_string.as_str()).unwrap());
     headers.insert("Signature", header::HeaderValue::from_str(request_signature.as_str()).unwrap());
     let client = reqwest::Client::builder()
@@ -1598,9 +1600,11 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
     //Send the request
     println!("  URL: [{}]", inbox_url.as_str());
     let res = client.post(inbox_url.as_str()).send();
+    // println!("  URL: [{}]", "https://ladder.podcastindex.org/logmycalls.php");
+    // let res = client.post("https://ladder.podcastindex.org/logmycalls.php").send();
     match res.await {
         Ok(res) => {
-            println!("  Response: [{}]", res.status());
+            println!("  Response: [{:#?}]", res);
             return Ok(res.text().await.unwrap());
         }
         Err(e) => {
