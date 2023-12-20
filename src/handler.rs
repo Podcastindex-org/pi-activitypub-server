@@ -1624,10 +1624,10 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
     //println!("{:#?}", request.into_parts());
 
     //Send the request
-    // println!("  URL: [{}]", inbox_url.as_str());
-    // let res = client.post(inbox_url.as_str()).send();
-    println!("  URL: [{}]", "https://ladder.podcastindex.org/logmycalls.php");
-    let res = client.post("https://ladder.podcastindex.org/logmycalls.php").send();
+    println!("  URL: [{}]", inbox_url.as_str());
+    let res = client.post(inbox_url.as_str()).send();
+    // println!("  URL: [{}]", "https://ladder.podcastindex.org/logmycalls.php");
+    // let res = client.post("https://ladder.podcastindex.org/logmycalls.php").send();
     match res.await {
         Ok(res) => {
             println!("  Response: [{:#?}]", res);
