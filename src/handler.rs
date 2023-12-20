@@ -7,18 +7,22 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 //use serde_json::{Value};
 use std::time::{SystemTime, UNIX_EPOCH};
-use sha1::{Sha1, Digest};
-use sha2::{Sha256};
+use sha1::{Sha1};
+use sha2::{Sha256, Digest};
 use urlencoding;
 use reqwest::header;
 use chrono::{TimeZone, Utc};
 use rsa::{RsaPrivateKey, RsaPublicKey};
+use rsa::pkcs1v15::{SigningKey, VerifyingKey};
+use rsa::signature::{Keypair, RandomizedSigner, SignatureEncoding, Verifier, Signer};
 use dbif::{ActorRecord};
-use base64::{Engine as _, engine::{self, general_purpose}, alphabet};
-use secp256k1::hashes::{sha256, Hash};
-use secp256k1::Message;
-use sigh::{Key, PrivateKey, SigningConfig};
-use sigh::alg::RsaSha256;
+use base64::{Engine as _, engine::{general_purpose}};
+use rand::rngs::ThreadRng;
+use sha256::digest;
+// use secp256k1::hashes::{sha256, Hash};
+// use secp256k1::Message;
+// use sigh::{Key, PrivateKey, SigningConfig};
+// use sigh::alg::RsaSha256;
 
 
 //Globals ----------------------------------------------------------------------------------------------------
@@ -499,6 +503,7 @@ pub async fn podcasts(ctx: Context) -> Response {
             actor_keys = keys;
         }
         Err(e) => {
+            println!("Actor keys retreival error: [{:#?}].\n", e);
             return hyper::Response::builder()
                 .status(StatusCode::from_u16(500).unwrap())
                 .body(format!("Key error.").into())
@@ -513,6 +518,7 @@ pub async fn podcasts(ctx: Context) -> Response {
             actor_data = data;
         }
         Err(e) => {
+            println!("Actor object build error: [{:#?}].\n", e);
             return hyper::Response::builder()
                 .status(StatusCode::from_u16(500).unwrap())
                 .body(format!("Actor obect error.").into())
@@ -843,7 +849,7 @@ pub async fn inbox(ctx: Context) -> Response {
     //Is this a POST?
     if http_action.to_lowercase() == "post" {
         //let following_actor;
-        let (parts, body) = ctx.req.into_parts();
+        let (_parts, body) = ctx.req.into_parts();
         let body_bytes = hyper::body::to_bytes(body).await.unwrap();
         let body = std::str::from_utf8(&body_bytes).unwrap();
 
@@ -880,16 +886,17 @@ pub async fn inbox(ctx: Context) -> Response {
                                             accept_data = data;
                                         }
                                         Err(e) => {
+                                            println!("Build follow accept error: [{:#?}].\n", e);
                                             return hyper::Response::builder()
                                                 .status(StatusCode::from_u16(500).unwrap())
                                                 .body(format!("Accept build error.").into())
                                                 .unwrap();
                                         }
                                     }
-                                    let accept_json;
+                                    let _accept_json;
                                     match serde_json::to_string_pretty(&accept_data) {
                                         Ok(json_result) => {
-                                            accept_json = json_result;
+                                            _accept_json = json_result;
                                         }
                                         Err(e) => {
                                             println!("Response prep error: [{:#?}].\n", e);
@@ -910,7 +917,7 @@ pub async fn inbox(ctx: Context) -> Response {
 
                                 }
                                 Err(e) => {
-                                    println!("Bad actor.\n");
+                                    println!("Bad actor: [{}].\n", e);
                                     return hyper::Response::builder()
                                         .status(StatusCode::from_u16(400).unwrap())
                                         .body(format!("Bad actor.").into())
@@ -919,7 +926,7 @@ pub async fn inbox(ctx: Context) -> Response {
                             }
                         }
                         Err(e) => {
-                            println!("Bad actor.\n");
+                            println!("Bad actor: [{}].\n", e);
                             return hyper::Response::builder()
                                 .status(StatusCode::from_u16(400).unwrap())
                                 .body(format!("Bad actor.").into())
@@ -929,7 +936,7 @@ pub async fn inbox(ctx: Context) -> Response {
                 }
             }
             Err(e) => {
-                println!("Invalid request.\n");
+                println!("Invalid request: [{}].\n", e);
                 return hyper::Response::builder()
                     .status(StatusCode::from_u16(400).unwrap())
                     .body(format!("Invalid request.").into())
@@ -1488,13 +1495,23 @@ fn ap_get_actor_keys(podcast_guid: u64) -> Result<ActorKeys, Box<dyn Error>> {
 }
 
 pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequestAccept, inbox_url: String) -> Result<String, Box<dyn Error>> {
+
     println!("  AP Accepting Follow request from: {}", inbox_accept.object.actor);
 
     //##: Get actor keys for guid
     let actor_keys = ap_get_actor_keys(podcast_guid).unwrap();
 
     //##: Decode the private key
-    let private_key = sigh::PrivateKey::from_pem(actor_keys.pem_private_key.as_bytes()).unwrap();
+    //let private_key = sigh::PrivateKey::from_pem(actor_keys.pem_private_key.as_bytes()).unwrap();
+    let private_key;
+    match pkcs1::DecodeRsaPrivateKey::from_pkcs1_pem(&actor_keys.pem_private_key) {
+        Ok(pem_decoded_privkey) => {
+            private_key = pem_decoded_privkey;
+        }
+        Err(e) => {
+            return Err(Box::new(HydraError(format!("Error decoding private key: [{}]", e).into())));
+        }
+    }
 
     //Construct the POST body
     let post_body;
@@ -1513,8 +1530,9 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
     //##: NOTE: values below are sample values, to get your own values go to https://api.podcastindex.org
     let headers_to_hash = "(request-target) host date digest";
     let hash_algorithm = "rsa-sha256";
-    let header_date = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time mismatch.").as_secs().to_string();
-    let header_date_imf = httpdate::fmt_http_date(SystemTime::now());
+    let header_date_systime = SystemTime::now();
+    let header_date = header_date_systime.duration_since(UNIX_EPOCH).expect("Time mismatch.").as_secs().to_string();
+    let header_date_imf = httpdate::fmt_http_date(header_date_systime);
     let url_parts = url::Url::parse(inbox_url.as_str());
     match url_parts {
         Ok(_) => {}
@@ -1528,35 +1546,43 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
     let mut hasher = Sha256::new();
     hasher.update(post_body);
     let digest_hash = hasher.finalize();
-    let digest_string = format!("sha-256={}",general_purpose::STANDARD.encode(digest_hash));
+    let digest_string = format!("sha-256={}", general_purpose::STANDARD.encode(digest_hash));
     println!("Digest string: [{:#?}]", digest_string);
 
     //##: Create the authorization token.
     //##: The auth token is built by creating an sha1 hash of the key, secret and current time (as a string)
     //##: concatenated together. The hash is a lowercase string.
     let headers_for_hashing: String = format!(
-        "(request-target): post {}\nhost: {}\ndate: {}\ndigest: sha-256={}",
+        "(request-target): post {}\nhost: {}\ndate: {}\ndigest: sha-256={}\n",
         header_path,
         header_host,
         header_date,
         digest_string
     );
     //println!("Data to hash: [{}]", data4hash);
-    let mut hasher = Sha256::new();
-    hasher.update(headers_for_hashing);
-    let signature_string = hasher.finalize();
-    println!("Signature string: [{:x}]", signature_string);
+    // let mut hasher = Sha256::new();
+    // hasher.update(headers_for_hashing);
+    // let signature_string_hash = hasher.finalize();
+    let signature_string_hash = sha256::digest(headers_for_hashing);
+    println!("Signature string: [{:#?}]", signature_string_hash);
+
+    //##: Sign the hashed signature string
+    let signing_key = rsa::pkcs1v15::SigningKey::<Sha256>::new(private_key);
+    // Sign
+    let signature_string_signed = signing_key.sign(&signature_string_hash.as_bytes());
+    let signature_string_signed_b64 = general_purpose::STANDARD.encode(signature_string_signed.to_string());
+    //assert_ne!(signature_string_signed.to_bytes().as_ref(), data.as_slice());
 
     //##: The url to send to must be the follower actors inbox url
     let url = format!("{}", urlencoding::encode(&inbox_url));
 
     //##: Calculate the signature
     let request_signature = format!(
-        "keyId=\"https://ap.podcastindex.org/podcasts?id={}#main-key\",algorithm=\"{}\",headers=\"{}\",signature=\"{:x}\"",
+        "keyId=\"https://ap.podcastindex.org/podcasts?id={}#main-key\",algorithm=\"{}\",headers=\"{}\",signature=\"{}\"",
         podcast_guid,
         hash_algorithm,
         headers_to_hash,
-        signature_string
+        signature_string_signed_b64
     );
     let signature_header = request_signature.clone();
     let signature_header_string = signature_header.as_str();
@@ -1567,11 +1593,11 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
     let mut headers = header::HeaderMap::new();
     headers.insert("User-Agent", header::HeaderValue::from_static("Podcast Index AP/v0.1.2a"));
     headers.insert("Accept", header::HeaderValue::from_static("application/activity+json"));
-    headers.insert("Content-type", header::HeaderValue::from_static("application/json"));
+    headers.insert("Content-type", header::HeaderValue::from_static("application/ld+json"));
     //headers.insert("Host", header::HeaderValue::from_str(header_host).unwrap());
-    headers.insert("Date", header::HeaderValue::from_str(header_date_imf.as_str()).unwrap());
-    headers.insert("Digest", header::HeaderValue::from_str(digest_string.as_str()).unwrap());
-    headers.insert("Signature", header::HeaderValue::from_str(request_signature.as_str()).unwrap());
+    headers.insert("date", header::HeaderValue::from_str(header_date_imf.as_str()).unwrap());
+    headers.insert("digest", header::HeaderValue::from_str(digest_string.as_str()).unwrap());
+    headers.insert("signature", header::HeaderValue::from_str(request_signature.as_str()).unwrap());
     let client = reqwest::Client::builder()
         .default_headers(headers)
         .build()
@@ -1598,10 +1624,10 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
     //println!("{:#?}", request.into_parts());
 
     //Send the request
-    println!("  URL: [{}]", inbox_url.as_str());
-    let res = client.post(inbox_url.as_str()).send();
-    // println!("  URL: [{}]", "https://ladder.podcastindex.org/logmycalls.php");
-    // let res = client.post("https://ladder.podcastindex.org/logmycalls.php").send();
+    // println!("  URL: [{}]", inbox_url.as_str());
+    // let res = client.post(inbox_url.as_str()).send();
+    println!("  URL: [{}]", "https://ladder.podcastindex.org/logmycalls.php");
+    let res = client.post("https://ladder.podcastindex.org/logmycalls.php").send();
     match res.await {
         Ok(res) => {
             println!("  Response: [{:#?}]", res);
