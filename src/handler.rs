@@ -1546,8 +1546,8 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
     let mut hasher = Sha256::new();
     hasher.update(post_body.clone());
     let digest_hash = hasher.finalize();
-    let digest_string_b64 = format!("SHA-256={}", general_purpose::STANDARD.encode(digest_hash));
-    println!("Digest string: [{:#?}]", digest_string_b64);
+    let digest_string = format!("SHA-256={}", general_purpose::STANDARD.encode(digest_hash));
+    println!("Digest string: [{}]", digest_string);
 
     //##: Create the authorization token.
     //##: The auth token is built by creating an sha1 hash of the key, secret and current time (as a string)
@@ -1557,14 +1557,14 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
         header_path,
         header_host,
         header_date,
-        digest_string_b64
+        digest_string
     );
     //println!("Data to hash: [{}]", data4hash);
     // let mut hasher = Sha256::new();
     // hasher.update(headers_for_hashing);
     // let signature_string_hash = hasher.finalize();
     let signature_string_hash = sha256::digest(headers_for_hashing);
-    println!("Signature string: [{:#?}]", signature_string_hash);
+    println!("Signature string: [{}]", signature_string_hash);
 
     //##: Sign the hashed signature string
     let signing_key = rsa::pkcs1v15::SigningKey::<Sha256>::new(private_key);
