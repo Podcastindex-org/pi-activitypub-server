@@ -1553,7 +1553,7 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
     //##: The auth token is built by creating an sha1 hash of the key, secret and current time (as a string)
     //##: concatenated together. The hash is a lowercase string.
     let headers_for_hashing: String = format!(
-        "(request-target): post {}\nhost: {}\ndate: {}\ndigest: sha-256={}\n",
+        "(request-target): post {}\nhost: {}\ndate: {}\ndigest: {}",
         header_path,
         header_host,
         header_date,
@@ -1624,11 +1624,10 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
     //println!("{:#?}", request.into_parts());
 
     //Send the request
-    // println!("  URL: [{}]", inbox_url.as_str());
-    // let res = client.post(inbox_url.as_str()).send();
-    println!("  URL: [{}]", "https://ladder.podcastindex.org/logmycalls.php");
+    println!("  URL: [{}]", inbox_url.as_str());
+    //println!("  URL: [{}]", "https://ladder.podcastindex.org/logmycalls.php");
     let res = client
-        .post("https://ladder.podcastindex.org/logmycalls.php")
+        .post(inbox_url.as_str())
         .json(&post_body)
         .send();
     match res.await {
