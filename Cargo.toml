@@ -19,7 +19,7 @@ drop-root = "0.1.1"
 percent-encoding = "2.2"
 prost = "0.11.8"
 websocket = "0.26.5"
-reqwest = "0.11.22"
+reqwest = { version = "0.11.22", features = ["json"] }
 sha1 = "0.10.6"
 sha2 = "0.10.8"
 sha256 = "1.4.0"

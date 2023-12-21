@@ -1544,10 +1544,10 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
     let header_host = parts.host_str().unwrap();
     let header_path = parts.path();
     let mut hasher = Sha256::new();
-    hasher.update(post_body);
+    hasher.update(post_body.clone());
     let digest_hash = hasher.finalize();
-    let digest_string = format!("sha-256={}", general_purpose::STANDARD.encode(digest_hash));
-    println!("Digest string: [{:#?}]", digest_string);
+    let digest_string_b64 = format!("SHA-256={}", general_purpose::STANDARD.encode(digest_hash));
+    println!("Digest string: [{:#?}]", digest_string_b64);
 
     //##: Create the authorization token.
     //##: The auth token is built by creating an sha1 hash of the key, secret and current time (as a string)
@@ -1557,7 +1557,7 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
         header_path,
         header_host,
         header_date,
-        digest_string
+        digest_string_b64
     );
     //println!("Data to hash: [{}]", data4hash);
     // let mut hasher = Sha256::new();
@@ -1593,7 +1593,7 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
     let mut headers = header::HeaderMap::new();
     headers.insert("User-Agent", header::HeaderValue::from_static("Podcast Index AP/v0.1.2a"));
     headers.insert("Accept", header::HeaderValue::from_static("application/activity+json"));
-    headers.insert("Content-type", header::HeaderValue::from_static("application/ld+json"));
+    headers.insert("Content-type", header::HeaderValue::from_static("application/activity+json"));
     //headers.insert("Host", header::HeaderValue::from_str(header_host).unwrap());
     headers.insert("date", header::HeaderValue::from_str(header_date_imf.as_str()).unwrap());
     headers.insert("digest", header::HeaderValue::from_str(digest_string.as_str()).unwrap());
@@ -1624,10 +1624,13 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
     //println!("{:#?}", request.into_parts());
 
     //Send the request
-    println!("  URL: [{}]", inbox_url.as_str());
-    let res = client.post(inbox_url.as_str()).send();
-    // println!("  URL: [{}]", "https://ladder.podcastindex.org/logmycalls.php");
-    // let res = client.post("https://ladder.podcastindex.org/logmycalls.php").send();
+    // println!("  URL: [{}]", inbox_url.as_str());
+    // let res = client.post(inbox_url.as_str()).send();
+    println!("  URL: [{}]", "https://ladder.podcastindex.org/logmycalls.php");
+    let res = client
+        .post("https://ladder.podcastindex.org/logmycalls.php")
+        .json(&post_body)
+        .send();
     match res.await {
         Ok(res) => {
             println!("  Response: [{:#?}]", res);
