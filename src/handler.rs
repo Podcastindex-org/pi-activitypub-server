@@ -1542,7 +1542,9 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
     let header_path = parts.path();
 
     //##: Hash the POST body content and base64 encode it
-    let digest_hash = sha256::digest(post_body.clone());
+    let mut hasher = Sha256::new();
+    hasher.update(post_body.clone());
+    let digest_hash = hasher.finalize();
     let digest_string = format!("SHA-256={}", general_purpose::STANDARD.encode(digest_hash));
     println!("  Digest string: [{}]", digest_string);
 
@@ -1556,8 +1558,10 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
     );
 
     //##: Hash the signature string input
-    let signature_string_hash = sha256::digest(signature_string_input);
-    println!("  Signature string: [{}]", signature_string_hash);
+    let mut hasher = Sha256::new();
+    hasher.update(signature_string_input.clone());
+    let signature_string_hash = hasher.finalize();
+    println!("  Signature string: [{:?}]", signature_string_hash);
 
     //##: Sign the hashed signature string
     let signing_key = rsa::pkcs1v15::SigningKey::<Sha256>::new(private_key);
