@@ -1545,7 +1545,7 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
     let mut hasher = Sha256::new();
     hasher.update(post_body.clone());
     let digest_hash = hasher.finalize();
-    let digest_string = format!("SHA-256={}", general_purpose::STANDARD.encode(digest_hash));
+    let digest_string = format!("SHA-256={}", general_purpose::STANDARD.encode(&digest_hash));
     println!("  Digest string: [{}]", digest_string);
 
     //##: Build the string that will be hashed into the signature header
@@ -1565,10 +1565,10 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
 
     //##: Sign the hashed signature string
     let signing_key = rsa::pkcs1v15::SigningKey::<Sha256>::new(private_key);
-    let signature_string_signed = signing_key.sign(&signature_string_hash.as_bytes());
+    let signature_string_signed = signing_key.sign(&signature_string_hash);
 
     //##: Base64 encode the hashed string
-    let signature_string_signed_b64 = general_purpose::STANDARD.encode(signature_string_signed.to_string());
+    let signature_string_signed_b64 = general_purpose::STANDARD.encode(signature_string_signed.to_bytes().as_ref());
 
     //##: The url to send to must be the follower actor's inbox url
     let url = format!("{}", urlencoding::encode(&inbox_url));
