@@ -1,11 +1,9 @@
-use crate::{Context, Response};
+use crate::{Context, crypto_rsa, http_signature, Response};
 use hyper::StatusCode;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
-//use std::fs;
 use serde::{Deserialize, Serialize};
-//use serde_json::{Value};
 use std::time::{SystemTime, UNIX_EPOCH};
 use sha1::{Sha1};
 use sha2::{Sha256, Digest};
@@ -19,10 +17,6 @@ use dbif::{ActorRecord};
 use base64::{Engine as _, engine::{general_purpose}};
 use rand::rngs::ThreadRng;
 use sha256::digest;
-// use secp256k1::hashes::{sha256, Hash};
-// use secp256k1::Message;
-// use sigh::{Key, PrivateKey, SigningConfig};
-// use sigh::alg::RsaSha256;
 
 
 //Globals ----------------------------------------------------------------------------------------------------
@@ -1503,7 +1497,7 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
 
     //##: Decode the private key for the podcast actor
     let private_key;
-    match pkcs1::DecodeRsaPrivateKey::from_pkcs1_pem(&actor_keys.pem_private_key) {
+    match crypto_rsa::rsa_private_key_from_pkcs1_pem(&actor_keys.pem_private_key) {
         Ok(pem_decoded_privkey) => {
             private_key = pem_decoded_privkey;
         }
@@ -1523,7 +1517,24 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
         }
     }
     println!("  POST BODY: {:#?}", post_body);
-    
+
+    let key_id = format!("https://ap.podcastindex.org/podcasts?id={}#main-key", podcast_guid);
+    let http_signature_headers ;
+    match http_signature::create_http_signature(
+        http::Method::POST,
+        inbox_url.as_str(),
+        &post_body.clone(),
+        &private_key,
+        &key_id
+    ) {
+        Ok(sig_headers) => {
+            http_signature_headers = sig_headers;
+        }
+        Err(e) => {
+            return Err(Box::new(HydraError(format!("Could not build http signature headers: [{}]", e).into())));
+        }
+    }
+
     //##: Build the header values we need to send with the POST
     let headers_to_hash = "(request-target) host date digest";
     let hash_algorithm = "rsa-sha256";
@@ -1590,9 +1601,9 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
     headers.insert("User-Agent", header::HeaderValue::from_static("Podcast Index AP/v0.1.2a"));
     headers.insert("Accept", header::HeaderValue::from_static("application/activity+json"));
     headers.insert("Content-type", header::HeaderValue::from_static("application/activity+json"));
-    headers.insert("date", header::HeaderValue::from_str(header_date_imf.as_str()).unwrap());
-    headers.insert("digest", header::HeaderValue::from_str(digest_string.as_str()).unwrap());
-    headers.insert("signature", header::HeaderValue::from_str(request_signature.as_str()).unwrap());
+    headers.insert("date", header::HeaderValue::from_str(&http_signature_headers.date).unwrap());
+    headers.insert("digest", header::HeaderValue::from_str(&http_signature_headers.digest.unwrap()).unwrap());
+    headers.insert("signature", header::HeaderValue::from_str(&http_signature_headers.signature).unwrap());
     let client = reqwest::Client::builder()
         .default_headers(headers)
         .build()
@@ -1627,16 +1638,3 @@ fn iso8601(utime: u64) -> String {
     // Formats the combined date and time with the specified format string.
     datetime.format("%+").to_string()
 }
-
-// fn sign_request<B>(request: &mut http::Request<B>, private_key_pem: &[u8]) -> Result<(), sigh::Error> {
-//     let private_key = PrivateKey::from_pem(private_key_pem)?;
-//     SigningConfig::new(RsaSha256, &private_key, "my-key-id")
-//         .sign(request)
-// }
-
-// fn get_sys_time_in_secs() -> u64 {
-//     match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
-//         Ok(n) => n.as_secs(),
-//         Err(_) => panic!("SystemTime before UNIX EPOCH!"),
-//     }
-// }

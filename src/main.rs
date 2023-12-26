@@ -16,6 +16,9 @@ use std::env;
 //Globals ----------------------------------------------------------------------------------------------------
 mod handler;
 mod router;
+mod http_signature;
+mod crypto_rsa;
+mod base64;
 
 type Response = hyper::Response<hyper::Body>;
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
