@@ -1516,13 +1516,13 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
             return Err(Box::new(HydraError(format!("Error building post body: [{}]", e).into())));
         }
     }
-    println!("  POST BODY: {:#?}", post_body);
+    println!("  POST BODY: {}", post_body);
 
     let key_id = format!("https://ap.podcastindex.org/podcasts?id={}#main-key", podcast_guid);
     let http_signature_headers ;
     match http_signature::create_http_signature(
         http::Method::POST,
-        inbox_url.as_str(),
+        &inbox_url,
         &post_body.clone(),
         &private_key,
         &key_id
@@ -1535,66 +1535,66 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
         }
     }
 
-    //##: Build the header values we need to send with the POST
-    let headers_to_hash = "(request-target) host date digest";
-    let hash_algorithm = "rsa-sha256";
-    let header_date_systime = SystemTime::now();
-    let header_date = header_date_systime.duration_since(UNIX_EPOCH).expect("Time mismatch.").as_secs().to_string();
-    let header_date_imf = httpdate::fmt_http_date(header_date_systime);
-    let url_parts = url::Url::parse(inbox_url.as_str());
-    match url_parts {
-        Ok(_) => {}
-        Err(e) => {
-            return Err(Box::new(HydraError(format!("Invalid inbox url: [{}]", e).into())));
-        }
-    }
-    let parts = url_parts.unwrap();
-    let header_host = parts.host_str().unwrap();
-    let header_path = parts.path();
-
-    //##: Hash the POST body content and base64 encode it
-    let mut hasher = Sha256::new();
-    hasher.update(post_body.clone());
-    let digest_hash = hasher.finalize();
-    let digest_string = format!("SHA-256={}", general_purpose::STANDARD.encode(&digest_hash));
-    println!("  Digest string: [{}]", digest_string);
-
-    //##: Build the string that will be hashed into the signature header
-    let signature_string_input: String = format!(
-        "(request-target): post {}\nhost: {}\ndate: {}\ndigest: {}",
-        header_path,
-        header_host,
-        header_date,
-        digest_string
-    );
-
-    //##: Hash the signature string input
-    let mut hasher = Sha256::new();
-    hasher.update(signature_string_input.clone());
-    let signature_string_hash = hasher.finalize();
-    println!("  Signature string: [{:?}]", signature_string_hash);
-
-    //##: Sign the hashed signature string
-    let signing_key = rsa::pkcs1v15::SigningKey::<Sha256>::new(private_key);
-    let signature_string_signed = signing_key.sign(&signature_string_hash);
-
-    //##: Base64 encode the hashed string
-    let signature_string_signed_b64 = general_purpose::STANDARD.encode(signature_string_signed.to_bytes().as_ref());
-
-    //##: The url to send to must be the follower actor's inbox url
-    let url = format!("{}", urlencoding::encode(&inbox_url));
-
-    //##: Build the signature header value to send with the POST
-    let request_signature = format!(
-        "keyId=\"https://ap.podcastindex.org/podcasts?id={}#main-key\",algorithm=\"{}\",headers=\"{}\",signature=\"{}\"",
-        podcast_guid,
-        hash_algorithm,
-        headers_to_hash,
-        signature_string_signed_b64
-    );
-    let signature_header = request_signature.clone();
-    let signature_header_string = signature_header.as_str();
-    println!("Signature header value: [{:#?}]", request_signature);
+    // //##: Build the header values we need to send with the POST
+    // let headers_to_hash = "(request-target) host date digest";
+    // let hash_algorithm = "rsa-sha256";
+    // let header_date_systime = SystemTime::now();
+    // let header_date = header_date_systime.duration_since(UNIX_EPOCH).expect("Time mismatch.").as_secs().to_string();
+    // let header_date_imf = httpdate::fmt_http_date(header_date_systime);
+    // let url_parts = url::Url::parse(inbox_url.as_str());
+    // match url_parts {
+    //     Ok(_) => {}
+    //     Err(e) => {
+    //         return Err(Box::new(HydraError(format!("Invalid inbox url: [{}]", e).into())));
+    //     }
+    // }
+    // let parts = url_parts.unwrap();
+    // let header_host = parts.host_str().unwrap();
+    // let header_path = parts.path();
+    //
+    // //##: Hash the POST body content and base64 encode it
+    // let mut hasher = Sha256::new();
+    // hasher.update(post_body.clone());
+    // let digest_hash = hasher.finalize();
+    // let digest_string = format!("SHA-256={}", general_purpose::STANDARD.encode(&digest_hash));
+    // println!("  Digest string: [{}]", digest_string);
+    //
+    // //##: Build the string that will be hashed into the signature header
+    // let signature_string_input: String = format!(
+    //     "(request-target): post {}\nhost: {}\ndate: {}\ndigest: {}",
+    //     header_path,
+    //     header_host,
+    //     header_date,
+    //     digest_string
+    // );
+    //
+    // //##: Hash the signature string input
+    // let mut hasher = Sha256::new();
+    // hasher.update(signature_string_input.clone());
+    // let signature_string_hash = hasher.finalize();
+    // println!("  Signature string: [{:?}]", signature_string_hash);
+    //
+    // //##: Sign the hashed signature string
+    // let signing_key = rsa::pkcs1v15::SigningKey::<Sha256>::new(private_key);
+    // let signature_string_signed = signing_key.sign(&signature_string_hash);
+    //
+    // //##: Base64 encode the hashed string
+    // let signature_string_signed_b64 = general_purpose::STANDARD.encode(signature_string_signed.to_bytes().as_ref());
+    //
+    // //##: The url to send to must be the follower actor's inbox url
+    // let url = format!("{}", urlencoding::encode(&inbox_url));
+    //
+    // //##: Build the signature header value to send with the POST
+    // let request_signature = format!(
+    //     "keyId=\"https://ap.podcastindex.org/podcasts?id={}#main-key\",algorithm=\"{}\",headers=\"{}\",signature=\"{}\"",
+    //     podcast_guid,
+    //     hash_algorithm,
+    //     headers_to_hash,
+    //     signature_string_signed_b64
+    // );
+    // let signature_header = request_signature.clone();
+    // let signature_header_string = signature_header.as_str();
+    // println!("Signature header value: [{:#?}]", request_signature);
 
     //##: Build the query with the required headers
     let mut headers = header::HeaderMap::new();
@@ -1602,6 +1602,7 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
     headers.insert("Accept", header::HeaderValue::from_static("application/activity+json"));
     headers.insert("Content-type", header::HeaderValue::from_static("application/activity+json"));
     headers.insert("date", header::HeaderValue::from_str(&http_signature_headers.date).unwrap());
+    headers.insert("host", header::HeaderValue::from_str(&http_signature_headers.host).unwrap());
     headers.insert("digest", header::HeaderValue::from_str(&http_signature_headers.digest.unwrap()).unwrap());
     headers.insert("signature", header::HeaderValue::from_str(&http_signature_headers.signature).unwrap());
     let client = reqwest::Client::builder()
@@ -1613,12 +1614,14 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
     println!("  ACCEPT SENT: [{}]", inbox_url.as_str());
     let res = client
         .post(inbox_url.as_str())
-        .json(&post_body)
+        .body(post_body)
         .send();
     match res.await {
         Ok(res) => {
             println!("  Response: [{:#?}]", res);
-            return Ok(res.text().await.unwrap());
+            let res_body = res.text().await?;
+            println!("  Body: [{:#?}]", res_body);
+            return Ok(res_body);
         }
         Err(e) => {
             eprintln!("  Error: [{}]", e);
