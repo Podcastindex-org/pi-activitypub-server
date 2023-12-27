@@ -189,13 +189,25 @@ fn episode_tracker() {
                                         let latest_episode_details = latest_episode.unwrap();
                                         if actor.last_episode_guid != latest_episode_details.guid {
                                             //##: Loop through the followers of this podcast and send updates if there are any
+
+
+                                            //TODO, this needs to be a single shared_inbox call instead of per follower
+                                            let mut shared_inboxes_called = Vec::new();
                                             for follower in followers {
-                                                ap_block_send_note(
-                                                    actor.pcid,
-                                                    latest_episode_details,
-                                                    follower.shared_inbox,
-                                                );
+                                                if !shared_inboxes_called.contains(&follower.shared_inbox) {
+                                                    ap_block_send_note(
+                                                        actor.pcid,
+                                                        latest_episode_details,
+                                                        follower.shared_inbox.clone(),
+                                                    );
+                                                    shared_inboxes_called.push(follower.shared_inbox.clone());
+                                                }
                                             }
+
+
+
+
+
                                             dbif::update_actor_last_episode_guid_in_db(
                                                 &AP_DATABASE_FILE.to_string(),
                                                 actor.pcid,
