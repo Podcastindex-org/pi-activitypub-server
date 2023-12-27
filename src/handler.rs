@@ -13,7 +13,7 @@ use chrono::{TimeZone, Utc};
 use rsa::{RsaPrivateKey, RsaPublicKey};
 use rsa::pkcs1v15::{SigningKey, VerifyingKey};
 use rsa::signature::{Keypair, RandomizedSigner, SignatureEncoding, Verifier, Signer};
-use dbif::{ActorRecord};
+use dbif::{ActorRecord, FollowerRecord};
 use base64::{Engine as _, engine::{general_purpose}};
 use rand::rngs::ThreadRng;
 use sha256::digest;
@@ -917,11 +917,40 @@ pub async fn inbox(ctx: Context) -> Response {
 
                                     //##: Send the accept request to the follower inbox url
                                     println!("  Send the follow accept request.");
-                                    ap_send_follow_accept(
+                                    match ap_send_follow_accept(
                                         podcast_guid.parse::<u64>().unwrap(),
                                         accept_data,
-                                        actor_data.inbox
-                                    ).await;
+                                        actor_data.inbox.clone()
+                                    ).await {
+                                        Ok(_) => {
+                                            let instance_fqdn = get_host_from_url(actor_data.inbox.clone());
+                                            match dbif::add_follower_to_db(&"ap.db".to_string(), FollowerRecord {
+                                                pcid: podcast_guid.parse::<u64>().unwrap(),
+                                                actor: actor_data.id.clone(),
+                                                instance: instance_fqdn,
+                                                inbox: actor_data.inbox,
+                                                shared_inbox: actor_data.endpoints.sharedInbox,
+                                                status: "active".to_string(),
+                                            }) {
+                                                Ok(_) => {
+                                                    println!("Saved follow: [{}|{}]", podcast_guid, actor_data.id);
+                                                }
+                                                Err(e) => {
+                                                    eprintln!("Unable to save follow state: [{}].\n", e);
+                                                    return hyper::Response::builder()
+                                                        .status(StatusCode::from_u16(400).unwrap())
+                                                        .body(format!("Unable to save follow state.").into())
+                                                        .unwrap();
+                                                }
+                                            }
+                                        }
+                                        Err(e) => {
+                                            return hyper::Response::builder()
+                                                .status(StatusCode::from_u16(400).unwrap())
+                                                .body(format!("Acknowledging failed.").into())
+                                                .unwrap();
+                                        }
+                                    };
 
                                 }
                                 Err(e) => {
@@ -1620,9 +1649,14 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
     match res.await {
         Ok(res) => {
             println!("  Response: [{:#?}]", res);
-            let res_body = res.text().await?;
-            println!("  Body: [{:#?}]", res_body);
-            return Ok(res_body);
+            if res.status() >= StatusCode::from_u16(200)? && res.status() <= StatusCode::from_u16(299)? {
+                return Ok("".to_string());
+            } else {
+                let res_body = res.text().await?;
+                println!("  Body: [{:#?}]", res_body);
+                return Err(Box::new(HydraError(format!("Accepting the follow request failed.").into())));
+            }
+
         }
         Err(e) => {
             eprintln!("  Error: [{}]", e);
@@ -1773,4 +1807,12 @@ fn iso8601(utime: u64) -> String {
 
     // Formats the combined date and time with the specified format string.
     datetime.format("%+").to_string()
+}
+
+fn get_host_from_url(url: String) -> String {
+    let request_url_object = url::Url::parse(&url).unwrap();
+    request_url_object.host_str()
+        .ok_or(url::ParseError::EmptyHost)
+        .unwrap()
+        .to_string()
 }
