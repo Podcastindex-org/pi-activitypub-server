@@ -1599,6 +1599,7 @@ fn ap_get_actor_keys(podcast_guid: u64) -> Result<ActorKeys, Box<dyn Error>> {
                 guid: "".to_string(),
                 pem_private_key: pem_priv_key.clone(),
                 pem_public_key: pem_pub_key.clone(),
+                last_episode_guid: "".to_string(),
             });
             println!("Saved actor to DB");
 

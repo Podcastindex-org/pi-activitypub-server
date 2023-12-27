@@ -160,45 +160,65 @@ fn episode_tracker() {
     println!("TRACKER: Polling podcast data.");
 
     loop {
-        match dbif::get_followers_from_db(&AP_DATABASE_FILE.to_string(), 920666) {
-            Ok(followers) => {
-                //##: Lookup API of podcast
-                println!("  Podcast - 920666");
-                match api_block_get_episodes(API_KEY, API_SECRET, "920666") {
-                    Ok(response_body) => {
-                        //eprintln!("{:#?}", response_body);
-                        match serde_json::from_str(response_body.as_str()) {
-                            Ok(data) => {
-                                let podcast_data: PIEpisodes = data;
-                                //TODO Get this code out of this deep level of nesting
-                                let latest_episode = podcast_data.items.get(0);
-                                if latest_episode.is_some() {
-                                    //##: Loop through the followers of this podcast and send updates if there are any
-                                    for follower in followers {
-                                        ap_block_send_note(
-                                            920666,
-                                            latest_episode.unwrap(),
-                                            follower.shared_inbox,
-                                        );
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                eprintln!("  API response prep error: [{:#?}].\n", e);
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("  API call error: [{:#?}].\n", e);
-                    }
-                }
+        let actors;
+        match dbif::get_actors_from_db(&AP_DATABASE_FILE.to_string()) {
+            Ok(actor_list) => {
+                actors = actor_list;
             }
             Err(e) => {
-                eprintln!("  Error getting followers from the database: [{:#?}]", e);
+                eprintln!("  Error getting actors from the database: [{:#?}]", e);
+                continue;
             }
         }
 
+        for actor in actors {
+            match dbif::get_followers_from_db(&AP_DATABASE_FILE.to_string(), actor.pcid) {
+                Ok(followers) => {
+                    //##: Lookup API of podcast
+                    println!("  Podcast - [{}]", actor.pcid);
+                    match api_block_get_episodes(API_KEY, API_SECRET, &actor.pcid.to_string()) {
+                        Ok(response_body) => {
+                            //eprintln!("{:#?}", response_body);
+                            match serde_json::from_str(response_body.as_str()) {
+                                Ok(data) => {
+                                    let podcast_data: PIEpisodes = data;
+                                    //TODO Get this code out of this deep level of nesting
+                                    let latest_episode = podcast_data.items.get(0);
+                                    if latest_episode.is_some() {
+                                        let latest_episode_details = latest_episode.unwrap();
+                                        if actor.last_episode_guid != latest_episode_details.guid {
+                                            //##: Loop through the followers of this podcast and send updates if there are any
+                                            for follower in followers {
+                                                ap_block_send_note(
+                                                    actor.pcid,
+                                                    latest_episode_details,
+                                                    follower.shared_inbox,
+                                                );
+                                            }
+                                            dbif::update_actor_last_episode_guid_in_db(
+                                                &AP_DATABASE_FILE.to_string(),
+                                                actor.pcid,
+                                                latest_episode_details.guid.clone()
+                                            );
+                                        }
 
+                                    }
+                                }
+                                Err(e) => {
+                                    eprintln!("  API response prep error: [{:#?}].\n", e);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("  API call error: [{:#?}].\n", e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("  Error getting followers from the database: [{:#?}]", e);
+                }
+            }
+        }
 
         break;
     }

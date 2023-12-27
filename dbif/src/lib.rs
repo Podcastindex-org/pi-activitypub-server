@@ -46,6 +46,7 @@ pub struct ActorRecord {
     pub guid: String,
     pub pem_private_key: String,
     pub pem_public_key: String,
+    pub last_episode_guid: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -122,7 +123,8 @@ pub fn create_database(filepath: &String) -> Result<bool, Box<dyn Error>> {
              pcid integer primary key,
              guid text,
              pem_private_key text,
-             pem_public_key text
+             pem_public_key text,
+             last_episode_guid text
          )",
         [],
     ) {
@@ -235,14 +237,16 @@ pub fn add_actor_to_db(filepath: &String, actor: ActorRecord) -> Result<bool, Bo
                                       pcid, \
                                       guid, \
                                       pem_private_key, \
-                                      pem_public_key\
+                                      pem_public_key, \
+                                      last_episode_guid \
                                     ) \
-                        VALUES (?1, ?2, ?3, ?4)",
+                        VALUES (?1, ?2, ?3, ?4, ?5)",
                        params![
                            actor.pcid,
                            actor.guid,
                            actor.pem_private_key,
-                           actor.pem_public_key
+                           actor.pem_public_key,
+                           actor.last_episode_guid
                        ]
     ) {
         Ok(_) => {
@@ -251,6 +255,26 @@ pub fn add_actor_to_db(filepath: &String, actor: ActorRecord) -> Result<bool, Bo
         Err(e) => {
             eprintln!("{}", e);
             return Err(Box::new(HydraError(format!("Failed to add actor: [{}].", actor.pcid).into())))
+        }
+    }
+}
+pub fn update_actor_last_episode_guid_in_db(filepath: &String, pcid: u64, episode_guid: String) -> Result<bool, Box<dyn Error>> {
+    let conn = connect_to_database(false, filepath)?;
+
+    match conn.execute("UPDATE actors \
+                            SET last_episode_guid = ?1 \
+                            WHERE pcid = ?2",
+                       params![
+                           episode_guid,
+                           pcid,
+                       ]
+    ) {
+        Ok(_) => {
+            Ok(true)
+        }
+        Err(e) => {
+            eprintln!("{}", e);
+            return Err(Box::new(HydraError(format!("Failed to update guid: [{}] for pcid: [{}].", episode_guid, pcid).into())))
         }
     }
 }
@@ -264,7 +288,8 @@ pub fn get_actor_from_db(filepath: &String, pcid: u64) -> Result<ActorRecord, Bo
                                     pcid, \
                                     guid,\
                                     pem_private_key, \
-                                    pem_public_key \
+                                    pem_public_key, \
+                                    last_episode_guid \
                                  FROM actors \
                                  WHERE pcid = :pcid \
                                  ORDER BY pcid DESC \
@@ -275,6 +300,7 @@ pub fn get_actor_from_db(filepath: &String, pcid: u64) -> Result<ActorRecord, Bo
             guid: row.get(1)?,
             pem_private_key: row.get(2)?,
             pem_public_key: row.get(3)?,
+            last_episode_guid: row.get(4)?,
         })
     }).unwrap();
 
@@ -301,7 +327,8 @@ pub fn get_actors_from_db(filepath: &String) -> Result<Vec<ActorRecord>, Box<dyn
                                     pcid, \
                                     guid,\
                                     pem_private_key, \
-                                    pem_public_key \
+                                    pem_public_key, \
+                                    last_episode_guid \
                                  FROM actors \
                                  ORDER BY instance DESC \
                                  LIMIT :max")?;
@@ -311,6 +338,7 @@ pub fn get_actors_from_db(filepath: &String) -> Result<Vec<ActorRecord>, Box<dyn
             guid: row.get(1)?,
             pem_private_key: row.get(2)?,
             pem_public_key: row.get(3)?,
+            last_episode_guid: row.get(4)?,
         })
     }).unwrap();
 
