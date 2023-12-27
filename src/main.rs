@@ -173,6 +173,7 @@ fn episode_tracker() {
                                 //TODO Get this code out of this deep level of nesting
                                 let latest_episode = podcast_data.items.get(0);
                                 if latest_episode.is_some() {
+                                    //##: Loop through the followers of this podcast and send updates if there are any
                                     for follower in followers {
                                         ap_block_send_note(
                                             920666,

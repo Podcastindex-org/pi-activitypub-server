@@ -327,22 +327,10 @@ pub fn add_follower_to_db(filepath: &String, follower: FollowerRecord) -> Result
 pub fn remove_follower_from_db(filepath: &String, follower: FollowerRecord) -> Result<bool, Box<dyn Error>> {
     let conn = connect_to_database(false, filepath)?;
 
-    match conn.execute("INSERT INTO followers (\
-                                      pcid, \
-                                      actor, \
-                                      instance, \
-                                      inbox, \
-                                      shared_inbox, \
-                                      status \
-                                    ) \
-                        VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+    match conn.execute("DELETE FROM followers WHERE pcid=?1 AND actor=?2",
                        params![
                            follower.pcid,
                            follower.actor,
-                           follower.instance,
-                           follower.inbox,
-                           follower.shared_inbox,
-                           follower.status
                        ]
     ) {
         Ok(_) => {

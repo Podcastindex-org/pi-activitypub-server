@@ -133,6 +133,24 @@ pub struct InboxRequest {
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug)]
+pub struct InboxRequestWithObject {
+    id: String,
+    r#type: String,
+    actor: String,
+    object: InboxRequestObject,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct InboxRequestObject {
+    id: String,
+    r#type: String,
+    actor: String,
+    object: String,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct InboxRequestAccept {
     #[serde(rename = "@context", skip_deserializing)]
     at_context: String,
@@ -863,6 +881,7 @@ pub async fn inbox(ctx: Context) -> Response {
 
         println!("{}", body);
 
+        let mut request_parsed = true;
         let inbox_request = serde_json::from_str::<InboxRequest>(body);
         println!("Incoming request: {:#?}", inbox_request);
         match inbox_request {
@@ -973,33 +992,47 @@ pub async fn inbox(ctx: Context) -> Response {
                 }
             }
             Err(e) => {
-                println!("Invalid request: [{}].\n", e);
-                return hyper::Response::builder()
-                    .status(StatusCode::from_u16(400).unwrap())
-                    .body(format!("Invalid request.").into())
-                    .unwrap();
+                println!("Could not parse incoming request: [{}].\n", e);
+                request_parsed = false;
             }
         }
+
+        if !request_parsed {
+            let inbox_request_alt = serde_json::from_str::<InboxRequestWithObject>(body);
+            println!("Incoming request: {:#?}", inbox_request_alt);
+            match inbox_request_alt {
+                Ok(incoming_data) => {
+                    request_parsed = true;
+                    if incoming_data.r#type.to_lowercase() == "undo"
+                        && incoming_data.object.r#type.to_lowercase() == "follow"
+                    {
+                        dbif::remove_follower_from_db(&AP_DATABASE_FILE.to_string(), FollowerRecord {
+                            pcid: podcast_guid.parse::<u64>().unwrap(),
+                            actor: incoming_data.actor,
+                            instance: "".to_string(),
+                            inbox: "".to_string(),
+                            shared_inbox: "".to_string(),
+                            status: "".to_string(),
+                        });
+                    }
+                }
+                Err(e) => {
+                    return hyper::Response::builder()
+                        .status(StatusCode::from_u16(400).unwrap())
+                        .body(format!("Error undoing.").into())
+                        .unwrap();
+                }
+            }
+        }
+
+        if !request_parsed {
+            return hyper::Response::builder()
+                .status(StatusCode::from_u16(400).unwrap())
+                .body(format!("Invalid request format.").into())
+                .unwrap();
+        }
+
     }
-
-
-    // //Make sure a session param was given
-    // let guid;
-    // match params.get("id") {
-    //     Some(resource) => {
-    //         println!("  Id: {}\n", resource);
-    //         let parts = resource.replace("acct:", "");
-    //         guid = parts.split("@").next().unwrap().to_string();
-    //     }
-    //     None => {
-    //         println!("Invalid resource.\n");
-    //         return hyper::Response::builder()
-    //             .status(StatusCode::from_u16(400).unwrap())
-    //             .body(format!("No resource given.").into())
-    //             .unwrap();
-    //     }
-    // }
-    // let podcast_guid = guid.clone();
 
     //TODO: validate the key signature before accepting request
 
