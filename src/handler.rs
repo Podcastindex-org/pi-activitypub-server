@@ -102,7 +102,7 @@ pub struct Actor {
     discoverable: bool,
     indexable: Option<bool>,
     preferredUsername: String,
-    published: String,
+    published: Option<String>,
     memorial: Option<bool>,
     devices: Option<String>,
     tag: Vec<String>,
@@ -1527,7 +1527,7 @@ fn ap_build_actor_object(podcast_data: PIPodcast, actor_keys: ActorKeys) -> Resu
         manuallyApprovesFollowers: false,
         indexable: Some(true),
         memorial: Some(false),
-        published: "2023-11-09T15:56:28.495803Z".to_string(),
+        published: Some("2023-11-09T15:56:28.495803Z".to_string()),
         devices: None,
         tag: vec!(),
     });
