@@ -176,6 +176,11 @@ fn episode_tracker() {
                                 latest_episode.unwrap(),
                                 "https://podcastindex.social/inbox".to_string(),
                             );
+                            ap_block_send_note(
+                                920666,
+                                latest_episode.unwrap(),
+                                "https://noagendasocial.com/inbox".to_string(),
+                            );
                         }
                     }
                     Err(e) => {
