@@ -137,7 +137,7 @@ pub fn create_database(filepath: &String) -> Result<bool, Box<dyn Error>> {
 
     //Create indexes on the actors table
     match conn.execute(
-        "CREATE INDEX IF NOTE EXISTS guid_idx ON actors (guid)",
+        "CREATE INDEX IF NOT EXISTS guid_idx ON actors (guid)",
         [],
     ) {
         Ok(_) => {
