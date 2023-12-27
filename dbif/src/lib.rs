@@ -210,6 +210,19 @@ pub fn create_database(filepath: &String) -> Result<bool, Box<dyn Error>> {
         }
     }
 
+    match conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS unique_follow_idx ON followers (pcid,actor)",
+        [],
+    ) {
+        Ok(_) => {
+            println!("Followers index created.");
+        }
+        Err(e) => {
+            eprintln!("{}", e);
+            return Err(Box::new(HydraError(format!("Failed to create database followers index: [{}].", filepath).into())))
+        }
+    }
+
     Ok(true)
 }
 
@@ -311,6 +324,36 @@ pub fn add_follower_to_db(filepath: &String, follower: FollowerRecord) -> Result
         }
     }
 }
+pub fn remove_follower_from_db(filepath: &String, follower: FollowerRecord) -> Result<bool, Box<dyn Error>> {
+    let conn = connect_to_database(false, filepath)?;
+
+    match conn.execute("INSERT INTO followers (\
+                                      pcid, \
+                                      actor, \
+                                      instance, \
+                                      inbox, \
+                                      shared_inbox, \
+                                      status \
+                                    ) \
+                        VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                       params![
+                           follower.pcid,
+                           follower.actor,
+                           follower.instance,
+                           follower.inbox,
+                           follower.shared_inbox,
+                           follower.status
+                       ]
+    ) {
+        Ok(_) => {
+            Ok(true)
+        }
+        Err(e) => {
+            eprintln!("{}", e);
+            return Err(Box::new(HydraError(format!("Failed to remove follower: [{}].", follower.actor).into())))
+        }
+    }
+}
 pub fn get_followers_from_db(filepath: &String, pcid: u64) -> Result<Vec<FollowerRecord>, Box<dyn Error>> {
     let conn = connect_to_database(false, filepath)?;
     let mut followers: Vec<FollowerRecord> = Vec::new();
@@ -323,7 +366,7 @@ pub fn get_followers_from_db(filepath: &String, pcid: u64) -> Result<Vec<Followe
                                     instance, \
                                     inbox, \
                                     shared_inbox, \
-                                    status, \
+                                    status \
                                  FROM followers \
                                  WHERE pcid = :pcid \
                                  ORDER BY instance DESC \
