@@ -21,8 +21,8 @@ use sha256::digest;
 
 //Globals ----------------------------------------------------------------------------------------------------
 //TODO: These secrets need to be moved into the environment
-const API_KEY: &str = "B899NK69ERMRE2M6HD3B";
-const API_SECRET: &str = "J3v9m$4b6NCD9ENV4QEKYb^DnWdcGR$^Gq7#5uwS";
+pub const API_KEY: &str = "B899NK69ERMRE2M6HD3B";
+pub const API_SECRET: &str = "J3v9m$4b6NCD9ENV4QEKYb^DnWdcGR$^Gq7#5uwS";
 
 
 //Structs ----------------------------------------------------------------------------------------------------
@@ -174,6 +174,20 @@ pub struct Object {
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
+pub struct Create {
+    #[serde(rename = "@context", skip_deserializing)]
+    at_context: String,
+    id: String,
+    r#type: String,
+    actor: String,
+    published: String,
+    to: Vec<String>,
+    cc: Option<Vec<String>>,
+    object: Object,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize)]
 pub struct Item {
     id: String,
     r#type: String,
@@ -260,51 +274,51 @@ pub struct Status {
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
 pub struct PIFeed {
-    id: u64,
-    podcastGuid: String,
-    medium: String,
-    title: String,
-    url: String,
-    originalUrl: String,
-    link: String,
-    description: String,
-    author: String,
-    ownerName: String,
-    image: String,
-    artwork: String,
-    episodeCount: u64,
+    pub id: u64,
+    pub podcastGuid: String,
+    pub medium: String,
+    pub title: String,
+    pub url: String,
+    pub originalUrl: String,
+    pub link: String,
+    pub description: String,
+    pub author: String,
+    pub ownerName: String,
+    pub image: String,
+    pub artwork: String,
+    pub episodeCount: u64,
 }
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
 pub struct PIPodcast {
-    status: String,
-    feed: PIFeed,
+    pub status: String,
+    pub feed: PIFeed,
 }
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
 pub struct PIItem {
-    id: u64,
-    title: String,
-    link: String,
-    description: String,
-    guid: String,
-    datePublished: u64,
-    datePublishedPretty: String,
-    enclosureUrl: String,
-    enclosureType: String,
-    duration: u64,
-    image: String,
-    feedImage: String,
+    pub id: u64,
+    pub title: String,
+    pub link: String,
+    pub description: String,
+    pub guid: String,
+    pub datePublished: u64,
+    pub datePublishedPretty: String,
+    pub enclosureUrl: String,
+    pub enclosureType: String,
+    pub duration: u64,
+    pub image: String,
+    pub feedImage: String,
 }
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
 pub struct PIEpisodes {
-    status: String,
-    items: Vec<PIItem>,
-    count: u64,
+    pub status: String,
+    pub items: Vec<PIItem>,
+    pub count: u64,
 }
 
 #[derive(Debug)]
@@ -1535,67 +1549,6 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
         }
     }
 
-    // //##: Build the header values we need to send with the POST
-    // let headers_to_hash = "(request-target) host date digest";
-    // let hash_algorithm = "rsa-sha256";
-    // let header_date_systime = SystemTime::now();
-    // let header_date = header_date_systime.duration_since(UNIX_EPOCH).expect("Time mismatch.").as_secs().to_string();
-    // let header_date_imf = httpdate::fmt_http_date(header_date_systime);
-    // let url_parts = url::Url::parse(inbox_url.as_str());
-    // match url_parts {
-    //     Ok(_) => {}
-    //     Err(e) => {
-    //         return Err(Box::new(HydraError(format!("Invalid inbox url: [{}]", e).into())));
-    //     }
-    // }
-    // let parts = url_parts.unwrap();
-    // let header_host = parts.host_str().unwrap();
-    // let header_path = parts.path();
-    //
-    // //##: Hash the POST body content and base64 encode it
-    // let mut hasher = Sha256::new();
-    // hasher.update(post_body.clone());
-    // let digest_hash = hasher.finalize();
-    // let digest_string = format!("SHA-256={}", general_purpose::STANDARD.encode(&digest_hash));
-    // println!("  Digest string: [{}]", digest_string);
-    //
-    // //##: Build the string that will be hashed into the signature header
-    // let signature_string_input: String = format!(
-    //     "(request-target): post {}\nhost: {}\ndate: {}\ndigest: {}",
-    //     header_path,
-    //     header_host,
-    //     header_date,
-    //     digest_string
-    // );
-    //
-    // //##: Hash the signature string input
-    // let mut hasher = Sha256::new();
-    // hasher.update(signature_string_input.clone());
-    // let signature_string_hash = hasher.finalize();
-    // println!("  Signature string: [{:?}]", signature_string_hash);
-    //
-    // //##: Sign the hashed signature string
-    // let signing_key = rsa::pkcs1v15::SigningKey::<Sha256>::new(private_key);
-    // let signature_string_signed = signing_key.sign(&signature_string_hash);
-    //
-    // //##: Base64 encode the hashed string
-    // let signature_string_signed_b64 = general_purpose::STANDARD.encode(signature_string_signed.to_bytes().as_ref());
-    //
-    // //##: The url to send to must be the follower actor's inbox url
-    // let url = format!("{}", urlencoding::encode(&inbox_url));
-    //
-    // //##: Build the signature header value to send with the POST
-    // let request_signature = format!(
-    //     "keyId=\"https://ap.podcastindex.org/podcasts?id={}#main-key\",algorithm=\"{}\",headers=\"{}\",signature=\"{}\"",
-    //     podcast_guid,
-    //     hash_algorithm,
-    //     headers_to_hash,
-    //     signature_string_signed_b64
-    // );
-    // let signature_header = request_signature.clone();
-    // let signature_header_string = signature_header.as_str();
-    // println!("Signature header value: [{:#?}]", request_signature);
-
     //##: Build the query with the required headers
     let mut headers = header::HeaderMap::new();
     headers.insert("User-Agent", header::HeaderValue::from_static("Podcast Index AP/v0.1.2a"));
@@ -1630,6 +1583,137 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
     }
 }
 
+pub async fn ap_send_note(podcast_guid: u64, episode: &PIItem, inbox_url: String) -> Result<String, Box<dyn Error>> {
+
+    println!("  AP Sending create episode note from actor: {}", podcast_guid);
+
+    //##: Get actor keys for guid
+    let actor_keys = ap_get_actor_keys(podcast_guid).unwrap();
+
+    //##: Decode the private key for the podcast actor
+    let private_key;
+    match crypto_rsa::rsa_private_key_from_pkcs1_pem(&actor_keys.pem_private_key) {
+        Ok(pem_decoded_privkey) => {
+            private_key = pem_decoded_privkey;
+        }
+        Err(e) => {
+            return Err(Box::new(HydraError(format!("Error decoding private key: [{}]", e).into())));
+        }
+    }
+
+    //##: Construct the episode note object to send
+    let create_action_object = Create {
+        at_context: "https://www.w3.org/ns/activitystreams".to_string(),
+        id: format!(
+            "https://ap.podcastindex.org/episodes?id={}&statusid={}&resource=activity",
+            podcast_guid,
+            episode.guid
+        ).to_string(),
+        r#type: "Create".to_string(),
+        actor: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
+        published: iso8601(episode.datePublished),
+        to: vec!(
+            "https://www.w3.org/ns/activitystreams#Public".to_string()
+        ),
+        cc: None,
+        object: Object {
+            id: format!(
+                "https://ap.podcastindex.org/episodes?id={}&statusid={}&resource=post",
+                podcast_guid,
+                episode.guid
+            ).to_string(),
+            r#type: "Note".to_string(),
+            summary: None,
+            inReplyTo: None,
+            published: iso8601(episode.datePublished),
+            url: format!(
+                "https://ap.podcastindex.org/episodes?id={}&statusid={}&resource=public",
+                podcast_guid,
+                episode.guid
+            ).to_string(),
+            attributedTo: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
+            to: vec!(
+                "https://www.w3.org/ns/activitystreams#Public".to_string()
+            ),
+            cc: None,
+            sensitive: false,
+            conversation: format!(
+                "tag:ap.podcastindex.org,{}:objectId={}:objectType=Conversation",
+                iso8601(episode.datePublished),
+                episode.guid
+            ).to_string(),
+            content: format!(
+                "<p>{:.128}</p><p>{:.128}</p><p>Listen: {}</p>",
+                episode.title,
+                episode.description,
+                episode.enclosureUrl
+            ),
+            attachment: vec!(),
+        },
+    };
+    //##: Convert the note create action to JSON and send
+    let create_json;
+    match serde_json::to_string_pretty(&create_action_object) {
+        Ok(json_result) => {
+            create_json = json_result;
+        }
+        Err(e) => {
+            eprintln!("Response prep error: [{:#?}].\n", e);
+            return Err(Box::new(HydraError(format!("Error building create note request json: [{}]", e).into())));
+        }
+    }
+
+    //##: Build the http signing headers
+    let key_id = format!("https://ap.podcastindex.org/podcasts?id={}#main-key", podcast_guid);
+    let http_signature_headers ;
+    match http_signature::create_http_signature(
+        http::Method::POST,
+        &inbox_url,
+        &create_json.clone(),
+        &private_key,
+        &key_id
+    ) {
+        Ok(sig_headers) => {
+            http_signature_headers = sig_headers;
+        }
+        Err(e) => {
+            return Err(Box::new(HydraError(format!("Could not build http signature headers: [{}]", e).into())));
+        }
+    }
+
+    //##: Build the query with the required headers
+    let mut headers = header::HeaderMap::new();
+    headers.insert("User-Agent", header::HeaderValue::from_static("Podcast Index AP/v0.1.2a"));
+    headers.insert("Accept", header::HeaderValue::from_static("application/activity+json"));
+    headers.insert("Content-type", header::HeaderValue::from_static("application/activity+json"));
+    headers.insert("date", header::HeaderValue::from_str(&http_signature_headers.date).unwrap());
+    headers.insert("host", header::HeaderValue::from_str(&http_signature_headers.host).unwrap());
+    headers.insert("digest", header::HeaderValue::from_str(&http_signature_headers.digest.unwrap()).unwrap());
+    headers.insert("signature", header::HeaderValue::from_str(&http_signature_headers.signature).unwrap());
+    let client = reqwest::Client::builder()
+        .default_headers(headers)
+        .build()
+        .unwrap();
+
+    //##: Send the Accept request
+    println!("  EPISODE NOTE SENT: [{}|{}|{}]", podcast_guid, episode.guid, inbox_url.as_str());
+    let res = client
+        .post(inbox_url.as_str())
+        .body(create_json)
+        .send();
+    match res.await {
+        Ok(res) => {
+            println!("  Response: [{:#?}]", res);
+            let res_body = res.text().await?;
+            println!("  Body: [{:#?}]", res_body);
+            return Ok(res_body);
+        }
+        Err(e) => {
+            eprintln!("  Error: [{}]", e);
+            return Err(Box::new(HydraError(format!("Error sending episode create note request: [{}]", e).into())));
+        }
+    }
+}
 
 
 //Utilities --------------------------------------------------------------------------------------------------

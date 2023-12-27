@@ -1,8 +1,4 @@
-use hyper::{
-    body::to_bytes,
-    service::{make_service_fn, service_fn},
-    Body, Request, Server,
-};
+use hyper::{body::to_bytes, service::{make_service_fn, service_fn}, Body, Request, Server, StatusCode};
 use route_recognizer::Params;
 use router::Router;
 use std::sync::Arc;
@@ -11,6 +7,8 @@ use hyper::server::conn::AddrStream;
 //use std::time;
 //use tokio::task;
 use std::env;
+use std::thread;
+use crate::handler::{api_get_episodes, API_KEY, API_SECRET, PIEpisodes};
 //use drop_root::set_user_group;
 
 //Globals ----------------------------------------------------------------------------------------------------
@@ -42,7 +40,6 @@ pub struct Context {
 //Functions --------------------------------------------------------------------------------------------------
 #[tokio::main]
 async fn main() {
-
     let args: Vec<String> = env::args().collect();
     let arg_port = &args[1];
     //let arg_chatid = &args[2];
@@ -53,6 +50,11 @@ async fn main() {
         eprintln!("Error initializing the database file.");
     }
 
+    //Start the LND polling thread.  This thread will poll LND every few seconds to
+    //get the latest invoices and store them in the database.
+    thread::spawn(move || {
+        episode_tracker(&"ap.db".to_string());
+    });
 
     let some_state = "state".to_string();
 
@@ -144,5 +146,44 @@ impl Context {
             }
         };
         Ok(serde_json::from_slice(&body_bytes)?)
+    }
+}
+
+async fn episode_tracker(filepath: &String) {
+    //TODO some sort of polling here against the PI API to detect when new episodes arrive for followed podcasts
+    //and then send them out to followers of those podcasts
+    tokio::time::sleep(tokio::time::Duration::from_millis(9000)).await;
+    println!("TRACKER: Polling podcast data.");
+
+    loop {
+        //##: Lookup API of podcast
+        println!("  Podcast - 920666");
+        match api_get_episodes(API_KEY, API_SECRET, "920666").await {
+            Ok(response_body) => {
+                //eprintln!("{:#?}", response_body);
+                match serde_json::from_str(response_body.as_str()) {
+                    Ok(data) => {
+                        let podcast_data: PIEpisodes = data;
+                        //TODO Get this code out of this deep level of nesting
+                        let latest_episode = podcast_data.items.get(0);
+                        if latest_episode.is_some() {
+                            handler::ap_send_note(
+                                920666,
+                                latest_episode.unwrap(),
+                                "https://podcastindex.social/inbox".to_string(),
+                            ).await;
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("  API response prep error: [{:#?}].\n", e);
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("  API call error: [{:#?}].\n", e);
+            }
+        }
+
+        break;
     }
 }
