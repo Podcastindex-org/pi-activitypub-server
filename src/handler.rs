@@ -1759,10 +1759,9 @@ pub fn ap_block_send_note(podcast_guid: u64, episode: &PIItem, inbox_url: String
                 episode.guid
             ).to_string(),
             content: format!(
-                "<p>{:.128}</p><p>{:.128}</p><p>Listen: <a href=\"{}\">{}</a></p>",
+                "<p>{:.128}</p><p>{:.128}</p><p>Listen: <a href=\"{}\">Listen!</a></p>",
                 episode.title,
                 episode.description,
-                episode.enclosureUrl,
                 episode.enclosureUrl,
             ),
             attachment: vec!(),
