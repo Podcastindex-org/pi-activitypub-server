@@ -156,10 +156,11 @@ impl Context {
 fn episode_tracker() {
     //TODO some sort of polling here against the PI API to detect when new episodes arrive for followed podcasts
     //and then send them out to followers of those podcasts
-    println!("TRACKER: Polling podcast data.");
 
     loop {
         thread::sleep(Duration::from_millis(LOOP_TIMER_MILLISECONDS));
+
+        println!("TRACKER: Polling podcast data.");
 
         let actors;
         match dbif::get_actors_from_db(&AP_DATABASE_FILE.to_string()) {
@@ -220,7 +221,5 @@ fn episode_tracker() {
                 }
             }
         }
-
-        break;
     }
 }
