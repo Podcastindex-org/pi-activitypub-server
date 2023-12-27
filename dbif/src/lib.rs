@@ -152,7 +152,7 @@ pub fn create_database(filepath: &String) -> Result<bool, Box<dyn Error>> {
     //Create the followers table
     match conn.execute(
         "CREATE TABLE IF NOT EXISTS followers (
-             pcid integer primary key,
+             pcid integer,
              actor text,
              instance text,
              inbox text,
@@ -173,6 +173,19 @@ pub fn create_database(filepath: &String) -> Result<bool, Box<dyn Error>> {
     //Create indexes on the followers table
     match conn.execute(
         "CREATE INDEX IF NOT EXISTS shared_inbox_idx ON followers (shared_inbox)",
+        [],
+    ) {
+        Ok(_) => {
+            println!("Followers index created.");
+        }
+        Err(e) => {
+            eprintln!("{}", e);
+            return Err(Box::new(HydraError(format!("Failed to create database followers index: [{}].", filepath).into())))
+        }
+    }
+
+    match conn.execute(
+        "CREATE INDEX IF NOT EXISTS pcid_idx ON followers (pcid)",
         [],
     ) {
         Ok(_) => {
