@@ -8,7 +8,8 @@ use hyper::server::conn::AddrStream;
 //use tokio::task;
 use std::env;
 use std::thread;
-use crate::handler::{api_get_episodes, API_KEY, API_SECRET, PIEpisodes};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use crate::handler::{api_block_get_episodes, ap_block_send_note, API_KEY, API_SECRET, PIEpisodes};
 //use drop_root::set_user_group;
 
 //Globals ----------------------------------------------------------------------------------------------------
@@ -17,6 +18,9 @@ mod router;
 mod http_signature;
 mod crypto_rsa;
 mod base64;
+
+const LOOP_TIMER_MILLISECONDS: u64 = 9000;
+const AP_DATABASE_FILE: &str = "database.db";
 
 type Response = hyper::Response<hyper::Body>;
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -46,14 +50,14 @@ async fn main() {
 
     //TODO: these must handle errors better
     //Make sure we have a good database
-    if dbif::create_database(&"ap.db".to_string()).is_err() {
+    if dbif::create_database(&AP_DATABASE_FILE.to_string()).is_err() {
         eprintln!("Error initializing the database file.");
     }
 
     //Start the LND polling thread.  This thread will poll LND every few seconds to
     //get the latest invoices and store them in the database.
     thread::spawn(move || {
-        episode_tracker(&"ap.db".to_string());
+        episode_tracker()
     });
 
     let some_state = "state".to_string();
@@ -149,16 +153,16 @@ impl Context {
     }
 }
 
-async fn episode_tracker(filepath: &String) {
+fn episode_tracker() {
     //TODO some sort of polling here against the PI API to detect when new episodes arrive for followed podcasts
     //and then send them out to followers of those podcasts
-    tokio::time::sleep(tokio::time::Duration::from_millis(9000)).await;
+    thread::sleep(Duration::from_millis(LOOP_TIMER_MILLISECONDS));
     println!("TRACKER: Polling podcast data.");
 
     loop {
         //##: Lookup API of podcast
         println!("  Podcast - 920666");
-        match api_get_episodes(API_KEY, API_SECRET, "920666").await {
+        match api_block_get_episodes(API_KEY, API_SECRET, "920666") {
             Ok(response_body) => {
                 //eprintln!("{:#?}", response_body);
                 match serde_json::from_str(response_body.as_str()) {
@@ -167,11 +171,11 @@ async fn episode_tracker(filepath: &String) {
                         //TODO Get this code out of this deep level of nesting
                         let latest_episode = podcast_data.items.get(0);
                         if latest_episode.is_some() {
-                            handler::ap_send_note(
+                            ap_block_send_note(
                                 920666,
                                 latest_episode.unwrap(),
                                 "https://podcastindex.social/inbox".to_string(),
-                            ).await;
+                            );
                         }
                     }
                     Err(e) => {

@@ -1352,6 +1352,54 @@ pub async fn api_get_episodes(key: &'static str, secret: &'static str, query: &s
 }
 
 
+pub fn api_block_get_episodes(key: &'static str, secret: &'static str, query: &str) -> Result<String, Box<dyn Error>> {
+    println!("  PI API Request: /episodes/byfeedid");
+
+    let api_key = key;
+    let api_secret = secret;
+
+    //##: ======== Required values ========
+    //##: WARNING: don't publish these to public repositories or in public places!
+    //##: NOTE: values below are sample values, to get your own values go to https://api.podcastindex.org
+    let api_time = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time mismatch.").as_secs().to_string();
+
+    //##: Create the authorization token.
+    //##: The auth token is built by creating an sha1 hash of the key, secret and current time (as a string)
+    //##: concatenated together. The hash is a lowercase string.
+    let data4hash: String = format!("{}{}{}", api_key, api_secret, api_time);
+    //println!("Data to hash: [{}]", data4hash);
+    let mut hasher = Sha1::new();
+    hasher.update(data4hash);
+    let authorization_token = hasher.finalize();
+    let api_hash: String = format!("{:X}", authorization_token).to_lowercase();
+    //println!("Hash String: [{}]", api_hash);
+
+    //##: Set up the parameters and the api endpoint url to call and make sure all params are
+    //##: url encoded before sending.
+    let url: String = format!("https://api.podcastindex.org/api/1.0/episodes/byfeedid?id={}", urlencoding::encode(query));
+
+    //##: Build the query with the required headers
+    let mut headers = header::HeaderMap::new();
+    headers.insert("User-Agent", header::HeaderValue::from_static("Rust-podcastindex-org-example/v1.0"));
+    headers.insert("X-Auth-Date", header::HeaderValue::from_str(api_time.as_str()).unwrap());
+    headers.insert("X-Auth-Key", header::HeaderValue::from_static(api_key));
+    headers.insert("Authorization", header::HeaderValue::from_str(api_hash.as_str()).unwrap());
+    let client = reqwest::blocking::Client::builder().default_headers(headers).build().unwrap();
+
+    //##: Send the request and display the results or the error
+    let res = client.get(url.as_str()).send();
+    match res {
+        Ok(res) => {
+            println!("  Response: [{}]", res.status());
+            return Ok(res.text().unwrap());
+        }
+        Err(e) => {
+            eprintln!("  Error: [{}]", e);
+            return Err(Box::new(HydraError(format!("Error running SQL query: [{}]", e).into())));
+        }
+    }
+}
+
 //ActivityPub helper functions -------------------------------------------------------------------------------
 fn ap_build_actor_object(podcast_data: PIPodcast, actor_keys: ActorKeys) -> Result<Actor, Box<dyn Error>> {
     let podcast_guid = podcast_data.feed.id;
@@ -1583,7 +1631,7 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
     }
 }
 
-pub async fn ap_send_note(podcast_guid: u64, episode: &PIItem, inbox_url: String) -> Result<String, Box<dyn Error>> {
+pub fn ap_block_send_note(podcast_guid: u64, episode: &PIItem, inbox_url: String) -> Result<String, Box<dyn Error>> {
 
     println!("  AP Sending create episode note from actor: {}", podcast_guid);
 
@@ -1690,7 +1738,7 @@ pub async fn ap_send_note(podcast_guid: u64, episode: &PIItem, inbox_url: String
     headers.insert("host", header::HeaderValue::from_str(&http_signature_headers.host).unwrap());
     headers.insert("digest", header::HeaderValue::from_str(&http_signature_headers.digest.unwrap()).unwrap());
     headers.insert("signature", header::HeaderValue::from_str(&http_signature_headers.signature).unwrap());
-    let client = reqwest::Client::builder()
+    let client = reqwest::blocking::Client::builder()
         .default_headers(headers)
         .build()
         .unwrap();
@@ -1701,10 +1749,10 @@ pub async fn ap_send_note(podcast_guid: u64, episode: &PIItem, inbox_url: String
         .post(inbox_url.as_str())
         .body(create_json)
         .send();
-    match res.await {
+    match res {
         Ok(res) => {
             println!("  Response: [{:#?}]", res);
-            let res_body = res.text().await?;
+            let res_body = res.text()?;
             println!("  Body: [{:#?}]", res_body);
             return Ok(res_body);
         }
