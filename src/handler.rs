@@ -23,7 +23,7 @@ use sha256::digest;
 //TODO: These secrets need to be moved into the environment
 pub const API_KEY: &str = "B899NK69ERMRE2M6HD3B";
 pub const API_SECRET: &str = "J3v9m$4b6NCD9ENV4QEKYb^DnWdcGR$^Gq7#5uwS";
-
+const AP_DATABASE_FILE: &str = "database.db";
 
 //Structs ----------------------------------------------------------------------------------------------------
 #[allow(non_snake_case)]
@@ -924,7 +924,7 @@ pub async fn inbox(ctx: Context) -> Response {
                                     ).await {
                                         Ok(_) => {
                                             let instance_fqdn = get_host_from_url(actor_data.inbox.clone());
-                                            match dbif::add_follower_to_db(&"ap.db".to_string(), FollowerRecord {
+                                            match dbif::add_follower_to_db(&AP_DATABASE_FILE.to_string(), FollowerRecord {
                                                 pcid: podcast_guid.parse::<u64>().unwrap(),
                                                 actor: actor_data.id.clone(),
                                                 instance: instance_fqdn,
@@ -1520,7 +1520,7 @@ fn ap_get_actor_keys(podcast_guid: u64) -> Result<ActorKeys, Box<dyn Error>> {
     let actor_keys;
     let pem_pub_key;
     let pem_priv_key;
-    match dbif::get_actor_from_db(&"ap.db".to_string(), podcast_guid) {
+    match dbif::get_actor_from_db(&AP_DATABASE_FILE.to_string(), podcast_guid) {
         Ok(actor_record) => {
             pem_pub_key = actor_record.pem_public_key;
             pem_priv_key = actor_record.pem_private_key;
@@ -1561,7 +1561,7 @@ fn ap_get_actor_keys(podcast_guid: u64) -> Result<ActorKeys, Box<dyn Error>> {
             }
             println!("Public key: {:.40}", pem_pub_key);
 
-            let _ = dbif::add_actor_to_db(&"ap.db".to_string(), ActorRecord {
+            let _ = dbif::add_actor_to_db(&AP_DATABASE_FILE.to_string(), ActorRecord {
                 pcid: podcast_guid,
                 guid: "".to_string(),
                 pem_private_key: pem_priv_key.clone(),

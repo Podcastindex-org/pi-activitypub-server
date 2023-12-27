@@ -160,38 +160,44 @@ fn episode_tracker() {
     println!("TRACKER: Polling podcast data.");
 
     loop {
-        //##: Lookup API of podcast
-        println!("  Podcast - 920666");
-        match api_block_get_episodes(API_KEY, API_SECRET, "920666") {
-            Ok(response_body) => {
-                //eprintln!("{:#?}", response_body);
-                match serde_json::from_str(response_body.as_str()) {
-                    Ok(data) => {
-                        let podcast_data: PIEpisodes = data;
-                        //TODO Get this code out of this deep level of nesting
-                        let latest_episode = podcast_data.items.get(0);
-                        if latest_episode.is_some() {
-                            ap_block_send_note(
-                                920666,
-                                latest_episode.unwrap(),
-                                "https://podcastindex.social/inbox".to_string(),
-                            );
-                            ap_block_send_note(
-                                920666,
-                                latest_episode.unwrap(),
-                                "https://noagendasocial.com/inbox".to_string(),
-                            );
+        match dbif::get_followers_from_db(&AP_DATABASE_FILE.to_string(), 920666) {
+            Ok(followers) => {
+                //##: Lookup API of podcast
+                println!("  Podcast - 920666");
+                match api_block_get_episodes(API_KEY, API_SECRET, "920666") {
+                    Ok(response_body) => {
+                        //eprintln!("{:#?}", response_body);
+                        match serde_json::from_str(response_body.as_str()) {
+                            Ok(data) => {
+                                let podcast_data: PIEpisodes = data;
+                                //TODO Get this code out of this deep level of nesting
+                                let latest_episode = podcast_data.items.get(0);
+                                if latest_episode.is_some() {
+                                    for follower in followers {
+                                        ap_block_send_note(
+                                            920666,
+                                            latest_episode.unwrap(),
+                                            follower.shared_inbox,
+                                        );
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("  API response prep error: [{:#?}].\n", e);
+                            }
                         }
                     }
                     Err(e) => {
-                        eprintln!("  API response prep error: [{:#?}].\n", e);
+                        eprintln!("  API call error: [{:#?}].\n", e);
                     }
                 }
             }
             Err(e) => {
-                eprintln!("  API call error: [{:#?}].\n", e);
+                eprintln!("  Error getting followers from the database: [{:#?}]", e);
             }
         }
+
+
 
         break;
     }
