@@ -291,6 +291,42 @@ pub fn get_actor_from_db(filepath: &String, pcid: u64) -> Result<ActorRecord, Bo
 
     Err(Box::new(HydraError(format!("Failed to get actor: [{}].", pcid).into())))
 }
+pub fn get_actors_from_db(filepath: &String) -> Result<Vec<ActorRecord>, Box<dyn Error>> {
+    let conn = connect_to_database(false, filepath)?;
+    let mut actors: Vec<ActorRecord> = Vec::new();
+    let max = 1000; //TODO: debug - hard limit for now
+
+    //Prepare and execute the query
+    let mut stmt = conn.prepare("SELECT \
+                                    pcid, \
+                                    guid,\
+                                    pem_private_key, \
+                                    pem_public_key \
+                                 FROM actors \
+                                 ORDER BY instance DESC \
+                                 LIMIT :max")?;
+    let rows = stmt.query_map(&[(":max", max.to_string().as_str())], |row| {
+        Ok(ActorRecord {
+            pcid: row.get(0)?,
+            guid: row.get(1)?,
+            pem_private_key: row.get(2)?,
+            pem_public_key: row.get(3)?,
+        })
+    }).unwrap();
+
+    //Parse the results
+    for row in rows {
+        let actor: ActorRecord = row.unwrap();
+        actors.push(actor);
+    }
+
+    if actors.len() > 0 {
+        return Ok(actors.clone());
+    }
+
+
+    Err(Box::new(HydraError(format!("Failed to get any actors.").into())))
+}
 
 
 //GetSet a follower in the database
