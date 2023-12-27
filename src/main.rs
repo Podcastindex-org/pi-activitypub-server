@@ -19,7 +19,7 @@ mod http_signature;
 mod crypto_rsa;
 mod base64;
 
-const LOOP_TIMER_MILLISECONDS: u64 = 15000;
+const LOOP_TIMER_MILLISECONDS: u64 = 60000;
 const AP_DATABASE_FILE: &str = "database.db";
 
 type Response = hyper::Response<hyper::Body>;
@@ -180,7 +180,6 @@ fn episode_tracker() {
                     println!("  Podcast - [{}]", actor.pcid);
                     match api_block_get_episodes(API_KEY, API_SECRET, &actor.pcid.to_string()) {
                         Ok(response_body) => {
-                            //eprintln!("{:#?}", response_body);
                             match serde_json::from_str(response_body.as_str()) {
                                 Ok(data) => {
                                     let podcast_data: PIEpisodes = data;
@@ -220,6 +219,8 @@ fn episode_tracker() {
                     eprintln!("  Error getting followers from the database: [{:#?}]", e);
                 }
             }
+
+            thread::sleep(Duration::from_millis(3000));
         }
     }
 }
