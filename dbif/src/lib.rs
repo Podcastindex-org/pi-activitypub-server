@@ -330,7 +330,7 @@ pub fn get_actors_from_db(filepath: &String) -> Result<Vec<ActorRecord>, Box<dyn
                                     pem_public_key, \
                                     last_episode_guid \
                                  FROM actors \
-                                 ORDER BY pcid DESC \
+                                 ORDER BY pcid ASC \
                                  LIMIT :max")?;
     let rows = stmt.query_map(&[(":max", max.to_string().as_str())], |row| {
         Ok(ActorRecord {
