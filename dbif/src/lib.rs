@@ -137,7 +137,7 @@ pub fn create_database(filepath: &String) -> Result<bool, Box<dyn Error>> {
 
     //Create indexes on the actors table
     match conn.execute(
-        "CREATE INDEX guid_idx ON actors (guid)",
+        "CREATE INDEX IF NOTE EXISTS guid_idx ON actors (guid)",
         [],
     ) {
         Ok(_) => {
@@ -172,7 +172,7 @@ pub fn create_database(filepath: &String) -> Result<bool, Box<dyn Error>> {
 
     //Create indexes on the followers table
     match conn.execute(
-        "CREATE INDEX shared_inbox_idx ON followers (shared_inbox)",
+        "CREATE INDEX IF NOT EXISTS shared_inbox_idx ON followers (shared_inbox)",
         [],
     ) {
         Ok(_) => {
@@ -185,7 +185,7 @@ pub fn create_database(filepath: &String) -> Result<bool, Box<dyn Error>> {
     }
 
     match conn.execute(
-        "CREATE INDEX actor_idx ON followers (actor)",
+        "CREATE INDEX IF NOT EXISTS actor_idx ON followers (actor)",
         [],
     ) {
         Ok(_) => {
