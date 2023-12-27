@@ -105,7 +105,7 @@ pub struct Actor {
     published: Option<String>,
     memorial: Option<bool>,
     devices: Option<String>,
-    tag: Vec<String>,
+    //tag: Vec<String>,
     name: String,
     inbox: String,
     outbox: String,
@@ -1529,7 +1529,7 @@ fn ap_build_actor_object(podcast_data: PIPodcast, actor_keys: ActorKeys) -> Resu
         memorial: Some(false),
         published: Some("2023-11-09T15:56:28.495803Z".to_string()),
         devices: None,
-        tag: vec!(),
+        //tag: vec!(),
     });
 }
 
