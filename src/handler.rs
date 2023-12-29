@@ -1930,9 +1930,10 @@ pub fn ap_block_send_live_note(podcast_guid: u64, episode: &PILiveItem, inbox_ur
     let create_action_object = Create {
         at_context: "https://www.w3.org/ns/activitystreams".to_string(),
         id: format!(
-            "https://ap.podcastindex.org/episodes?id={}&statusid={}&resource=activity",
+            "https://ap.podcastindex.org/episodes?id={}&statusid={}&date={}&type=live&resource=activity",
             podcast_guid,
-            episode.guid
+            episode.guid,
+            episode.datePublished
         ).to_string(),
         r#type: "Create".to_string(),
         actor: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
@@ -1943,18 +1944,20 @@ pub fn ap_block_send_live_note(podcast_guid: u64, episode: &PILiveItem, inbox_ur
         cc: None,
         object: Object {
             id: format!(
-                "https://ap.podcastindex.org/episodes?id={}&statusid={}&resource=post",
+                "https://ap.podcastindex.org/episodes?id={}&statusid={}&date={}&type=live&resource=post",
                 podcast_guid,
-                episode.guid
+                episode.guid,
+                episode.datePublished
             ).to_string(),
             r#type: "Note".to_string(),
             summary: None,
             inReplyTo: None,
             published: iso8601(episode.datePublished),
             url: format!(
-                "https://ap.podcastindex.org/episodes?id={}&statusid={}&resource=public",
+                "https://ap.podcastindex.org/episodes?id={}&statusid={}&date={}&type=live&resource=public",
                 podcast_guid,
-                episode.guid
+                episode.guid,
+                episode.datePublished
             ).to_string(),
             attributedTo: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
             to: vec!(
