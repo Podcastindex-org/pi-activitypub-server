@@ -314,9 +314,8 @@ fn live_item_tracker() {
 
                                                     }
                                                 }
-
+                                                break;
                                             }
-                                            break;
                                         }
                                     }
                                     Err(e) => {
