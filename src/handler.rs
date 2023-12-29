@@ -1968,7 +1968,7 @@ pub fn ap_block_send_live_note(podcast_guid: u64, episode: &PILiveItem, inbox_ur
                 episode.guid
             ).to_string(),
             content: format!(
-                "<p>{:.128}</p><p>{:.128}</p><p>Listen: <a href=\"{}\">Listen!</a></p>",
+                "<p>LIVE NOW!</p><p>{:.128}</p><p>{:.128}</p><p>Listen: <a href=\"{}\">Listen!</a></p>",
                 episode.title,
                 episode.description,
                 episode.enclosureUrl,
