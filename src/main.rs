@@ -7,7 +7,17 @@ use std::env;
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
-use crate::handler::{api_block_get_episodes, ap_block_send_note, API_KEY, API_SECRET, PIEpisodes, api_block_get_live_items};
+use crate::handler::{
+    api_block_get_episodes,
+    ap_block_send_note,
+    ap_block_send_live_note,
+    API_KEY,
+    API_SECRET,
+    PIEpisodes,
+    PILiveItems,
+    PILiveItem,
+    api_block_get_live_items
+};
 use url::Url;
 use tungstenite::{connect, Message};
 
@@ -71,36 +81,7 @@ pub struct Podping {
     pub version: String,
 }
 
-#[allow(non_snake_case)]
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct PILiveItems {
-    pub status: String,
-    pub liveItems: Vec<PILiveItem>,
-    pub count: u64,
-    pub query: String,
-    pub description: String,
-}
 
-#[allow(non_snake_case)]
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct PILiveItem {
-    pub id: u64,
-    pub title: String,
-    pub link: String,
-    pub description: String,
-    pub guid: String,
-    pub datePublished: u64,
-    pub datePublishedPretty: String,
-    pub enclosureUrl: String,
-    pub enclosureType: String,
-    pub startTime: Option<u64>,
-    pub endTime: Option<u64>,
-    pub status: String,
-    pub contentLink: String,
-    pub image: String,
-    pub feedImage: String,
-    pub feedId: u64,
-}
 
 //Functions --------------------------------------------------------------------------------------------------
 #[tokio::main]
@@ -311,6 +292,25 @@ fn live_item_tracker() {
                                                          live_item.feedId,
                                                          live_item.status
                                                 );
+                                                match dbif::get_followers_from_db(&AP_DATABASE_FILE.to_string(), live_item.feedId) {
+                                                    Ok(followers) => {
+                                                        let mut shared_inboxes_called = Vec::new();
+                                                        for follower in followers {
+                                                            if !shared_inboxes_called.contains(&follower.shared_inbox) {
+                                                                ap_block_send_live_note(
+                                                                    live_item.feedId,
+                                                                    &live_item,
+                                                                    follower.shared_inbox.clone(),
+                                                                );
+                                                                shared_inboxes_called.push(follower.shared_inbox.clone());
+                                                            }
+                                                        }
+                                                    }
+                                                    Err(e) => {
+
+                                                    }
+                                                }
+
                                             }
                                         }
                                     }

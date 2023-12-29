@@ -339,6 +339,37 @@ pub struct PIEpisodes {
     pub count: u64,
 }
 
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct PILiveItems {
+    pub status: String,
+    pub liveItems: Vec<PILiveItem>,
+    pub count: u64,
+    pub query: String,
+    pub description: String,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct PILiveItem {
+    pub id: u64,
+    pub title: String,
+    pub link: String,
+    pub description: String,
+    pub guid: String,
+    pub datePublished: u64,
+    pub datePublishedPretty: String,
+    pub enclosureUrl: String,
+    pub enclosureType: String,
+    pub startTime: Option<u64>,
+    pub endTime: Option<u64>,
+    pub status: String,
+    pub contentLink: String,
+    pub image: String,
+    pub feedImage: String,
+    pub feedId: u64,
+}
+
 #[derive(Debug)]
 pub struct HydraError(String);
 
@@ -1747,6 +1778,137 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
 }
 
 pub fn ap_block_send_note(podcast_guid: u64, episode: &PIItem, inbox_url: String) -> Result<String, Box<dyn Error>> {
+
+    println!("  AP Sending create episode note from actor: {}", podcast_guid);
+
+    //##: Get actor keys for guid
+    let actor_keys = ap_get_actor_keys(podcast_guid).unwrap();
+
+    //##: Decode the private key for the podcast actor
+    let private_key;
+    match crypto_rsa::rsa_private_key_from_pkcs1_pem(&actor_keys.pem_private_key) {
+        Ok(pem_decoded_privkey) => {
+            private_key = pem_decoded_privkey;
+        }
+        Err(e) => {
+            return Err(Box::new(HydraError(format!("Error decoding private key: [{}]", e).into())));
+        }
+    }
+
+    //##: Construct the episode note object to send
+    let create_action_object = Create {
+        at_context: "https://www.w3.org/ns/activitystreams".to_string(),
+        id: format!(
+            "https://ap.podcastindex.org/episodes?id={}&statusid={}&resource=activity",
+            podcast_guid,
+            episode.guid
+        ).to_string(),
+        r#type: "Create".to_string(),
+        actor: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
+        published: iso8601(episode.datePublished),
+        to: vec!(
+            "https://www.w3.org/ns/activitystreams#Public".to_string()
+        ),
+        cc: None,
+        object: Object {
+            id: format!(
+                "https://ap.podcastindex.org/episodes?id={}&statusid={}&resource=post",
+                podcast_guid,
+                episode.guid
+            ).to_string(),
+            r#type: "Note".to_string(),
+            summary: None,
+            inReplyTo: None,
+            published: iso8601(episode.datePublished),
+            url: format!(
+                "https://ap.podcastindex.org/episodes?id={}&statusid={}&resource=public",
+                podcast_guid,
+                episode.guid
+            ).to_string(),
+            attributedTo: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
+            to: vec!(
+                "https://www.w3.org/ns/activitystreams#Public".to_string()
+            ),
+            cc: None,
+            sensitive: false,
+            conversation: format!(
+                "tag:ap.podcastindex.org,{}:objectId={}:objectType=Conversation",
+                iso8601(episode.datePublished),
+                episode.guid
+            ).to_string(),
+            content: format!(
+                "<p>{:.128}</p><p>{:.128}</p><p>Listen: <a href=\"{}\">Listen!</a></p>",
+                episode.title,
+                episode.description,
+                episode.enclosureUrl,
+            ),
+            attachment: vec!(),
+        },
+    };
+    //##: Convert the note create action to JSON and send
+    let create_json;
+    match serde_json::to_string_pretty(&create_action_object) {
+        Ok(json_result) => {
+            create_json = json_result;
+        }
+        Err(e) => {
+            eprintln!("Response prep error: [{:#?}].\n", e);
+            return Err(Box::new(HydraError(format!("Error building create note request json: [{}]", e).into())));
+        }
+    }
+
+    //##: Build the http signing headers
+    let key_id = format!("https://ap.podcastindex.org/podcasts?id={}#main-key", podcast_guid);
+    let http_signature_headers ;
+    match http_signature::create_http_signature(
+        http::Method::POST,
+        &inbox_url,
+        &create_json.clone(),
+        &private_key,
+        &key_id
+    ) {
+        Ok(sig_headers) => {
+            http_signature_headers = sig_headers;
+        }
+        Err(e) => {
+            return Err(Box::new(HydraError(format!("Could not build http signature headers: [{}]", e).into())));
+        }
+    }
+
+    //##: Build the query with the required headers
+    let mut headers = header::HeaderMap::new();
+    headers.insert("User-Agent", header::HeaderValue::from_static("Podcast Index AP/v0.1.2a"));
+    headers.insert("Accept", header::HeaderValue::from_static("application/activity+json"));
+    headers.insert("Content-type", header::HeaderValue::from_static("application/activity+json"));
+    headers.insert("date", header::HeaderValue::from_str(&http_signature_headers.date).unwrap());
+    headers.insert("host", header::HeaderValue::from_str(&http_signature_headers.host).unwrap());
+    headers.insert("digest", header::HeaderValue::from_str(&http_signature_headers.digest.unwrap()).unwrap());
+    headers.insert("signature", header::HeaderValue::from_str(&http_signature_headers.signature).unwrap());
+    let client = reqwest::blocking::Client::builder()
+        .default_headers(headers)
+        .build()
+        .unwrap();
+
+    //##: Send the Accept request
+    println!("  EPISODE NOTE SENT: [{}|{}|{}]", podcast_guid, episode.guid, inbox_url.as_str());
+    let res = client
+        .post(inbox_url.as_str())
+        .body(create_json)
+        .send();
+    match res {
+        Ok(res) => {
+            println!("  Response: [{:#?}]", res);
+            let res_body = res.text()?;
+            println!("  Body: [{:#?}]", res_body);
+            return Ok(res_body);
+        }
+        Err(e) => {
+            eprintln!("  Error: [{}]", e);
+            return Err(Box::new(HydraError(format!("Error sending episode create note request: [{}]", e).into())));
+        }
+    }
+}
+pub fn ap_block_send_live_note(podcast_guid: u64, episode: &PILiveItem, inbox_url: String) -> Result<String, Box<dyn Error>> {
 
     println!("  AP Sending create episode note from actor: {}", podcast_guid);
 
