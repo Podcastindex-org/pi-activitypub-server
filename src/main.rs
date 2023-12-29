@@ -294,6 +294,8 @@ fn live_item_tracker() {
                         if first_iri.is_none() {
                             continue;
                         }
+                        //##: Sleep to let the index catch up
+                        thread::sleep(Duration::from_millis(LOOP_TIMER_MILLISECONDS));
                         match api_block_get_live_items(
                             API_KEY,
                             API_SECRET,
