@@ -56,7 +56,7 @@ pub struct SocketPayload {
     pub a: String,
     pub n: u64,
     pub o: u64,
-    pub p: Vec<Podping>,
+    pub p: Vec<PodpingPayload>,
     pub t: String,
     pub v: u64,
 }
@@ -267,14 +267,15 @@ fn live_item_tracker() {
 
     loop {
         let msg = socket.read_message().expect("Error reading message");
-        //println!(" Podping Received: {:#?}", msg);
+        //println!(" Podping Received: {:#?}", msg.to_text().unwrap());
         match serde_json::from_str(msg.to_text().unwrap()) {
             Ok(data) => {
                 let socket_payload: SocketPayload = data;
+                // println!("PODPING: [{:#?}]", socket_payload);
                 for podping in socket_payload.p {
-                    println!("PODPING: [{:#?}]", podping);
-                    if podping.reason == "live" {
-                        let first_iri = podping.iris.get(0);
+                    if podping.p.reason == "live" {
+                        println!("*****LIVE PODPING: [{:#?}]", socket_payload);
+                        let first_iri = podping.p.iris.get(0);
                         if first_iri.is_none() {
                             continue;
                         }
@@ -331,6 +332,7 @@ fn live_item_tracker() {
                 }
             }
             Err(e) => {
+                eprintln!("PODPING PARSE ERR: [{:#?}]", e);
             }
         }
     }
