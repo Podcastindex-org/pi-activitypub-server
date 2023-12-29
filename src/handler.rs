@@ -1850,12 +1850,23 @@ pub fn ap_block_send_note(podcast_guid: u64, episode: &PIItem, inbox_url: String
                 episode.guid
             ).to_string(),
             content: format!(
-                "<p>{:.128}</p><p>{:.128}</p><p>Listen: <a href=\"{}\">Listen!</a></p>",
+                "<p>{:.256}</p><p>{:.256}</p><p>Listen: <a href=\"{}\">Listen!</a></p>",
                 episode.title,
                 episode.description,
                 episode.enclosureUrl,
             ),
-            attachment: vec!(),
+            attachment: vec!(
+                NoteAttachment {
+                    r#type: Some("Document".to_string()),
+                    mediaType: None,
+                    url: Some(episode.feedImage.clone()),
+                    name: None,
+                    blurhash: None,
+                    width: Some(640),
+                    height: None,
+                    value: None,
+                }
+            ),
         },
     };
     //##: Convert the note create action to JSON and send
