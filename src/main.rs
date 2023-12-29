@@ -272,8 +272,8 @@ fn live_item_tracker() {
             Ok(data) => {
                 let socket_payload: SocketPayload = data;
                 for podping in socket_payload.p {
+                    println!("PODPING: [{:#?}]", podping);
                     if podping.reason == "live" {
-                        println!("*****LIVE PODPING*****");
                         let first_iri = podping.iris.get(0);
                         if first_iri.is_none() {
                             continue;
