@@ -284,7 +284,7 @@ fn live_item_tracker() {
 
     loop {
         let msg = socket.read_message().expect("Error reading message");
-        println!(" Podping Received: {:#?}", msg);
+        //println!(" Podping Received: {:#?}", msg);
         match serde_json::from_str(msg.to_text().unwrap()) {
             Ok(data) => {
                 let socket_payload: SocketPayload = data;
@@ -305,7 +305,7 @@ fn live_item_tracker() {
                                         let live_item_data: PILiveItems = response_data;
                                         for live_item in live_item_data.liveItems {
                                             if live_item.status == "live" {
-                                                println!("  PODPING LIVE - {} {}",
+                                                println!("*****PODPING LIVE - {} {}",
                                                          live_item.feedId,
                                                          live_item.status
                                                 );
