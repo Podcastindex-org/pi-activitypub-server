@@ -258,6 +258,8 @@ fn episode_tracker() {
 
 fn live_item_tracker() {
 
+    println!("PODPING: Connected to podping socket.");
+
     //##: TODO - reconnect socket if it falls down
     let (mut socket, response) = connect(
         Url::parse("wss://api.livewire.io/ws/podping").unwrap()
@@ -271,6 +273,7 @@ fn live_item_tracker() {
                 let socket_payload: SocketPayload = data;
                 for podping in socket_payload.p {
                     if podping.reason == "live" {
+                        println!("*****LIVE PODPING*****");
                         let first_iri = podping.iris.get(0);
                         if first_iri.is_none() {
                             continue;
