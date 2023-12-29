@@ -81,6 +81,19 @@ pub struct Attachment {
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug)]
+pub struct NoteAttachment {
+    name: Option<String>,
+    r#type: Option<String>,
+    value: Option<String>,
+    mediaType: Option<String>,
+    url: Option<String>,
+    blurhash: Option<String>,
+    width: Option<u64>,
+    height: Option<u64>,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Endpoints {
     sharedInbox: String,
 }
@@ -187,7 +200,7 @@ pub struct Object {
     sensitive: bool,
     conversation: String,
     content: String,
-    attachment: Vec<String>,
+    attachment: Vec<NoteAttachment>,
 }
 
 #[allow(non_snake_case)]
@@ -1971,12 +1984,22 @@ pub fn ap_block_send_live_note(podcast_guid: u64, episode: &PILiveItem, inbox_ur
                 episode.guid
             ).to_string(),
             content: format!(
-                "<p>LIVE NOW!</p><p>{:.128}</p><p>{:.128}</p><p>Listen: <a href=\"{}\">Listen!</a></p>",
+                "<p>{:.256} is now Live!</p><p>Stream: <a href=\"{}\">Listen Live!</a></p>",
                 episode.title,
-                episode.description,
                 episode.enclosureUrl,
             ),
-            attachment: vec!(),
+            attachment: vec!(
+                NoteAttachment {
+                    r#type: Some("Document".to_string()),
+                    mediaType: None,
+                    url: Some(episode.feedImage.clone()),
+                    name: None,
+                    blurhash: None,
+                    width: Some(640),
+                    height: None,
+                    value: None,
+                }
+            ),
         },
     };
     //##: Convert the note create action to JSON and send
