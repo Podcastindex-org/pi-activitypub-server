@@ -296,7 +296,7 @@ pub struct Status {
     sensitive: bool,
     conversation: String,
     content: String,
-    attachment: Vec<String>,
+    attachment: Option<Vec<NoteAttachment>>,
     actor: String,
     tag: Vec<String>,
     replies: Option<String>,    //TODO: This should refer to some sort of Collection pub struct
@@ -350,6 +350,13 @@ pub struct PIEpisodes {
     pub status: String,
     pub items: Vec<PIItem>,
     pub count: u64,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize)]
+pub struct PIEpisode {
+    pub status: String,
+    pub episode: PIItem,
 }
 
 #[allow(non_snake_case)]
@@ -1261,7 +1268,7 @@ pub async fn episodes(ctx: Context) -> Response {
                 podcast_guid
             ).to_string(),
             content: "This account is a podcast.  Follow to see new episodes.".to_string(),
-            attachment: vec!(),
+            attachment: Some(vec!()),
             actor: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
             tag: vec!(),
             replies: None,
@@ -1275,6 +1282,104 @@ pub async fn episodes(ctx: Context) -> Response {
                 println!("Response prep error: [{:#?}].\n", e);
                 return hyper::Response::builder()
                     .status(StatusCode::from_u16(500).unwrap())
+                    .body(format!("Response prep error.").into())
+                    .unwrap();
+            }
+        }
+    } else {
+        //Lookup API of podcast
+        let pi_data: PIEpisode;
+        let api_response = api_get_episode(
+            API_KEY,
+            API_SECRET,
+            &podcast_guid,
+            &episode_guid
+        ).await;
+        match api_response {
+            Ok(response_body) => {
+                //eprintln!("{:#?}", response_body);
+                match serde_json::from_str(response_body.as_str()) {
+                    Ok(data) => {
+                        pi_data = data;
+                        let episode_data = Status {
+                            at_context: vec!(
+                                "https://www.w3.org/ns/activitystreams".to_string(),
+                            ),
+                            id: format!(
+                                "https://ap.podcastindex.org/episodes?id={}&statusid={}",
+                                podcast_guid,
+                                episode_guid
+                            ).to_string(),
+                            r#type: "Note".to_string(),
+                            summary: None,
+                            inReplyTo: None,
+                            published: pi_data.episode.datePublishedPretty,
+                            url: None,
+                            attributedTo: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
+                            to: vec!(
+                                "https://www.w3.org/ns/activitystreams#Public".to_string()
+                            ),
+                            cc: Some(vec!(
+                                format!(
+                                    "https://ap.podcastindex.org/followers?id={}",
+                                    podcast_guid
+                                ).to_string()
+                            )),
+                            sensitive: false,
+                            conversation: format!(
+                                "https://ap.podcastindex.org/contexts?id={}&statusid={}",
+                                podcast_guid,
+                                episode_guid
+                            ).to_string(),
+                            content: format!(
+                                "<p>{:.256}</p><p>{:.256}</p><p>Listen: <a href=\"{}\">Listen!</a></p>",
+                                pi_data.episode.title,
+                                pi_data.episode.description,
+                                pi_data.episode.enclosureUrl,
+                            ).to_string(),
+                            attachment: Some(vec!(
+                                NoteAttachment {
+                                    r#type: Some("Document".to_string()),
+                                    mediaType: None,
+                                    url: Some(pi_data.episode.feedImage.clone()),
+                                    name: None,
+                                    blurhash: None,
+                                    width: Some(640),
+                                    height: None,
+                                    value: None,
+                                })
+                            ),
+                            actor: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
+                            tag: vec!(),
+                            replies: None,
+                        };
+
+                        match serde_json::to_string_pretty(&episode_data) {
+                            Ok(json_result) => {
+                                episode_json = json_result;
+                            }
+                            Err(e) => {
+                                println!("Response prep error: [{:#?}].\n", e);
+                                return hyper::Response::builder()
+                                    .status(StatusCode::from_u16(500).unwrap())
+                                    .body(format!("Response prep error.").into())
+                                    .unwrap();
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        println!("Response prep error: [{:#?}].\n", e);
+                        return hyper::Response::builder()
+                            .status(StatusCode::from_u16(501).unwrap())
+                            .body(format!("Response prep error.").into())
+                            .unwrap();
+                    }
+                }
+            }
+            Err(e) => {
+                println!("Response prep error: [{:#?}].\n", e);
+                return hyper::Response::builder()
+                    .status(StatusCode::from_u16(501).unwrap())
                     .body(format!("Response prep error.").into())
                     .unwrap();
             }
@@ -1434,6 +1539,58 @@ pub async fn api_get_episodes(key: &'static str, secret: &'static str, query: &s
     //##: Set up the parameters and the api endpoint url to call and make sure all params are
     //##: url encoded before sending.
     let url: String = format!("https://api.podcastindex.org/api/1.0/episodes/byfeedid?id={}", urlencoding::encode(query));
+
+    //##: Build the query with the required headers
+    let mut headers = header::HeaderMap::new();
+    headers.insert("User-Agent", header::HeaderValue::from_static("Rust-podcastindex-org-example/v1.0"));
+    headers.insert("X-Auth-Date", header::HeaderValue::from_str(api_time.as_str()).unwrap());
+    headers.insert("X-Auth-Key", header::HeaderValue::from_static(api_key));
+    headers.insert("Authorization", header::HeaderValue::from_str(api_hash.as_str()).unwrap());
+    let client = reqwest::Client::builder().default_headers(headers).build().unwrap();
+
+    //##: Send the request and display the results or the error
+    let res = client.get(url.as_str()).send();
+    match res.await {
+        Ok(res) => {
+            println!("  Response: [{}]", res.status());
+            return Ok(res.text().await.unwrap());
+        }
+        Err(e) => {
+            eprintln!("  Error: [{}]", e);
+            return Err(Box::new(HydraError(format!("Error running SQL query: [{}]", e).into())));
+        }
+    }
+}
+
+pub async fn api_get_episode(key: &'static str, secret: &'static str, query: &str, guid: &str) -> Result<String, Box<dyn Error>> {
+    println!("  PI API Request: /episodes/byguid");
+
+    let api_key = key;
+    let api_secret = secret;
+
+    //##: ======== Required values ========
+    //##: WARNING: don't publish these to public repositories or in public places!
+    //##: NOTE: values below are sample values, to get your own values go to https://api.podcastindex.org
+    let api_time = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time mismatch.").as_secs().to_string();
+
+    //##: Create the authorization token.
+    //##: The auth token is built by creating an sha1 hash of the key, secret and current time (as a string)
+    //##: concatenated together. The hash is a lowercase string.
+    let data4hash: String = format!("{}{}{}", api_key, api_secret, api_time);
+    //println!("Data to hash: [{}]", data4hash);
+    let mut hasher = Sha1::new();
+    hasher.update(data4hash);
+    let authorization_token = hasher.finalize();
+    let api_hash: String = format!("{:X}", authorization_token).to_lowercase();
+    //println!("Hash String: [{}]", api_hash);
+
+    //##: Set up the parameters and the api endpoint url to call and make sure all params are
+    //##: url encoded before sending.
+    let url: String = format!(
+        "https://api.podcastindex.org/api/1.0/episodes/byguid?guid={}&feedid={}",
+        urlencoding::encode(guid),
+        urlencoding::encode(query)
+    );
 
     //##: Build the query with the required headers
     let mut headers = header::HeaderMap::new();
