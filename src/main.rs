@@ -100,8 +100,26 @@ async fn main() {
     let arg_port = &args[1];
     //let arg_chatid = &args[2];
 
-    let env_pi_api_key = std::env::var("PI_API_KEY").unwrap();
-    let env_pi_api_secret = std::env::var("PI_API_SECRET").unwrap();
+    let env_pi_api_key;
+    match std::env::var("PI_API_KEY") {
+        Ok(key) => {
+            env_pi_api_key = key;
+        }
+        Err(_) => {
+            eprintln!("PI_API_KEY environment variable not set.");
+            std::process::exit(1);
+        }
+    }
+    let env_pi_api_secret;
+    match std::env::var("PI_API_SECRET") {
+        Ok(secret) => {
+            env_pi_api_secret = secret;
+        }
+        Err(_) => {
+            eprintln!("PI_API_SECRET environment variable not set.");
+            std::process::exit(1);
+        }
+    }
 
     //TODO: these must handle errors better
     //Make sure we have a good database
