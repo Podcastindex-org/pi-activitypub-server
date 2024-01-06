@@ -315,6 +315,7 @@ fn episode_tracker(api_key: String, api_secret: String) {
                 }
                 Err(e) => {
                     eprintln!("  Error getting followers from the database: [{:#?}]", e);
+                    continue;
                 }
             }
 
