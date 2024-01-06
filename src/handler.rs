@@ -1053,8 +1053,12 @@ pub async fn inbox(ctx: Context) -> Response {
     }).unwrap_or_else(HashMap::new);
 
     println!("\n\n----------");
-    println!("Request[{}]: {} from: {:#?}", http_action, ctx.req.uri(), ctx.req.headers().get("user-agent"));
-    println!("Context: {:#?}", ctx);
+    println!("Request[{}]: {} from: {:#?}",
+             http_action,
+             ctx.req.uri(),
+             ctx.req.headers().get("user-agent")
+    );
+    //println!("Context: {:#?}", ctx);
 
     //Make sure a session param was given
     let guid;
@@ -1082,17 +1086,17 @@ pub async fn inbox(ctx: Context) -> Response {
         let body_bytes = hyper::body::to_bytes(body).await.unwrap();
         let body = std::str::from_utf8(&body_bytes).unwrap();
 
-        println!("{}", body);
-
         let mut request_parsed = true;
         let inbox_request = serde_json::from_str::<InboxRequestWithObject>(body);
-        println!("Incoming request: {:#?}", inbox_request);
         match inbox_request {
             Ok(incoming_data) => {
                 //TODO: This should all be in separate functions
                 //TODO: If this incoming request is a verb other than follow, a different struct should be used
                 //TODO: ...for decoding, like a Create struct for the object data
-                if incoming_data.r#type.to_lowercase() == "follow" {
+                if incoming_data.r#type.to_lowercase() == "delete" {
+                    //TODO: Ignoring this for now
+                    println!("--Delete request");
+                } else if incoming_data.r#type.to_lowercase() == "follow" {
                     println!("--Follow request");
                     let client = reqwest::Client::new();
                     let response = client
@@ -1195,8 +1199,8 @@ pub async fn inbox(ctx: Context) -> Response {
                     }
 
                 } else if incoming_data.r#type.to_lowercase() == "undo" {
-
                     //##: Un-follow
+                    println!("--Unfollow request");
                     if incoming_data.object.r#type.is_some()
                         && incoming_data.object.r#type.as_ref().unwrap().to_lowercase() == "follow"
                     {
@@ -1209,7 +1213,10 @@ pub async fn inbox(ctx: Context) -> Response {
                             status: "".to_string(),
                         });
                     }
-
+                } else {
+                    println!("--Unhandled request type");
+                    println!("Incoming request: {:#?}", incoming_data);
+                    println!("BODY: {}", body);
                 }
             }
             Err(e) => {
