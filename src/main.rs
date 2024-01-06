@@ -1,25 +1,22 @@
-use hyper::{body::to_bytes, service::{make_service_fn, service_fn}, Body, Request, Server, StatusCode};
+use hyper::{body::to_bytes, service::{make_service_fn, service_fn}, Body, Request, Server};
 use route_recognizer::Params;
 use router::Router;
 use std::sync::Arc;
 use hyper::server::conn::AddrStream;
 use std::env;
 use std::thread;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration};
 use serde::{Deserialize, Serialize};
 use crate::handler::{
     api_block_get_episodes,
     ap_block_send_note,
     ap_block_send_live_note,
-    API_KEY,
-    API_SECRET,
     PIEpisodes,
     PILiveItems,
-    PILiveItem,
     api_block_get_live_items
 };
 use url::Url;
-use tungstenite::{connect, Message};
+use tungstenite::{connect};
 
 //Globals ----------------------------------------------------------------------------------------------------
 mod handler;
@@ -47,6 +44,8 @@ pub struct Context {
     pub state: AppState,
     pub req: Request<Body>,
     pub params: Params,
+    pub pi_auth: PIAuth,
+    pub version: String,
     body_bytes: Option<hyper::body::Bytes>,
 }
 
@@ -81,14 +80,28 @@ pub struct Podping {
     pub version: String,
 }
 
+#[allow(non_snake_case)]
+#[derive(Clone, Debug)]
+pub struct PIAuth {
+    pub key: String,
+    pub secret: String,
+}
 
 
 //Functions --------------------------------------------------------------------------------------------------
 #[tokio::main]
 async fn main() {
+    //Get what version we are
+    let version = env!("CARGO_PKG_VERSION");
+    println!("Version: {}", version);
+    println!("--------------------");
+
     let args: Vec<String> = env::args().collect();
     let arg_port = &args[1];
     //let arg_chatid = &args[2];
+
+    let env_pi_api_key = std::env::var("PI_API_KEY").unwrap();
+    let env_pi_api_secret = std::env::var("PI_API_SECRET").unwrap();
 
     //TODO: these must handle errors better
     //Make sure we have a good database
@@ -97,11 +110,16 @@ async fn main() {
     }
 
     //Start threads to track podcast new episodes and also podping
+    let env_tracker_pi_api_key = env_pi_api_key.clone();
+    let env_tracker_pi_api_secret = env_pi_api_secret.clone();
     thread::spawn(move || {
-        episode_tracker()
+        episode_tracker(env_tracker_pi_api_key, env_tracker_pi_api_secret);
     });
+
+    let env_live_pi_api_key = env_pi_api_key.clone();
+    let env_live_pi_api_secret = env_pi_api_secret.clone();
     thread::spawn(move || {
-        live_item_tracker()
+        live_item_tracker(env_live_pi_api_key, env_live_pi_api_secret)
     });
 
     let some_state = "state".to_string();
@@ -128,9 +146,20 @@ async fn main() {
         };
 
         let router_capture = shared_router.clone();
+        let pi_auth = PIAuth {
+            key: env_pi_api_key.clone(),
+            secret: env_pi_api_secret.clone(),
+        };
+        let main_version = version.clone().to_string();
         async {
             Ok::<_, Error>(service_fn(move |req| {
-                route(router_capture.clone(), req, app_state.clone())
+                route(
+                    router_capture.clone(),
+                    req,
+                    app_state.clone(),
+                    pi_auth.clone(),
+                    main_version.clone(),
+                )
             }))
         }
     });
@@ -147,21 +176,37 @@ async fn route(
     router: Arc<Router>,
     req: Request<hyper::Body>,
     app_state: AppState,
+    pi_auth: PIAuth,
+    version: String
 ) -> Result<Response, Error> {
     let found_handler = router.route(req.uri().path(), req.method());
     let resp = found_handler
         .handler
-        .invoke(Context::new(app_state, req, found_handler.params))
+        .invoke(Context::new(
+            app_state,
+            req,
+            found_handler.params,
+            pi_auth,
+            version
+        ))
         .await;
     Ok(resp)
 }
 
 impl Context {
-    pub fn new(state: AppState, req: Request<Body>, params: Params) -> Context {
+    pub fn new(
+        state: AppState,
+        req: Request<Body>,
+        params: Params,
+        pi_auth: PIAuth,
+        version: String,
+    ) -> Context {
         Context {
             state,
             req,
             params,
+            pi_auth,
+            version,
             body_bytes: None,
         }
     }
@@ -179,7 +224,7 @@ impl Context {
     }
 }
 
-fn episode_tracker() {
+fn episode_tracker(api_key: String, api_secret: String) {
     loop {
         thread::sleep(Duration::from_millis(LOOP_TIMER_MILLISECONDS));
 
@@ -201,7 +246,11 @@ fn episode_tracker() {
                 Ok(followers) => {
                     //##: Lookup API of podcast
                     println!("  Podcast - [{}]", actor.pcid);
-                    match api_block_get_episodes(API_KEY, API_SECRET, &actor.pcid.to_string()) {
+                    match api_block_get_episodes(
+                        &api_key,
+                        &api_secret,
+                        &actor.pcid.to_string()
+                    ) {
                         Ok(response_body) => {
                             match serde_json::from_str(response_body.as_str()) {
                                 Ok(data) => {
@@ -256,7 +305,7 @@ fn episode_tracker() {
     }
 }
 
-fn live_item_tracker() {
+fn live_item_tracker(api_key: String, api_secret: String) {
 
     println!("PODPING: Connected to podping socket.");
 
@@ -282,8 +331,8 @@ fn live_item_tracker() {
                         //##: Sleep to let the index catch up
                         thread::sleep(Duration::from_millis(LOOP_TIMER_MILLISECONDS));
                         match api_block_get_live_items(
-                            API_KEY,
-                            API_SECRET,
+                            &api_key,
+                            &api_secret,
                             first_iri.unwrap()
                         ) {
                             Ok(api_response) => {

@@ -37,4 +37,5 @@ httpdate = "1.0.3"
 thiserror = { version = "1.0.50", features = [] }
 pem = { version = "3.0.3", features = [] }
 tungstenite = { version = "0.21.0", features = ["native-tls"] }
+void = "1.0.2"
 #openssl = { version = "0.10", features = ["vendored"] }

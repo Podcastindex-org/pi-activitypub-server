@@ -3,26 +3,27 @@ use hyper::StatusCode;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
-use serde::{Deserialize, Serialize};
+use std::marker::PhantomData;
+use serde::{Deserialize, Serialize, Deserializer};
+use serde::de::{self, MapAccess, Visitor};
 use std::time::{SystemTime, UNIX_EPOCH};
 use sha1::{Sha1};
-use sha2::{Sha256, Digest};
+use sha2::{Digest};
 use urlencoding;
 use reqwest::header;
 use chrono::{TimeZone, Utc};
 use rsa::{RsaPrivateKey, RsaPublicKey};
-use rsa::pkcs1v15::{SigningKey, VerifyingKey};
-use rsa::signature::{Keypair, RandomizedSigner, SignatureEncoding, Verifier, Signer};
+//use rsa::pkcs1v15::{SigningKey, VerifyingKey};
+//use rsa::signature::{Keypair, RandomizedSigner, SignatureEncoding, Verifier, Signer};
 use dbif::{ActorRecord, FollowerRecord};
-use base64::{Engine as _, engine::{general_purpose}};
-use rand::rngs::ThreadRng;
-use sha256::digest;
+//use base64::{Engine as _, engine::{general_purpose}};
+//use rand::rngs::ThreadRng;
+//use sha256::digest;
+use core::str::FromStr;
+use void::Void;
 
 
 //Globals ----------------------------------------------------------------------------------------------------
-//TODO: These secrets need to be moved into the environment
-pub const API_KEY: &str = "B899NK69ERMRE2M6HD3B";
-pub const API_SECRET: &str = "J3v9m$4b6NCD9ENV4QEKYb^DnWdcGR$^Gq7#5uwS";
 const AP_DATABASE_FILE: &str = "database.db";
 
 //Structs ----------------------------------------------------------------------------------------------------
@@ -54,7 +55,7 @@ pub struct PublicKey {
 }
 
 #[allow(non_snake_case)]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Icon {
     r#type: String,
     mediaType: Option<String>,
@@ -62,17 +63,18 @@ pub struct Icon {
 }
 
 #[allow(non_snake_case)]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TagObject {
     id: String,
     r#type: String,
     name: Option<String>,
+    href: Option<String>,
     updated: Option<String>,
     icon: Option<Icon>,
 }
 
 #[allow(non_snake_case)]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Attachment {
     name: String,
     r#type: String,
@@ -149,17 +151,49 @@ pub struct InboxRequest {
 pub struct InboxRequestWithObject {
     id: String,
     r#type: String,
-    actor: String,
+    actor: Option<String>,
+    #[serde(default = "d_blank_inboxrequest", deserialize_with = "de_optional_string_or_struct")]
     object: InboxRequestObject,
 }
 
 #[allow(non_snake_case)]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct InboxRequestObject {
-    id: String,
-    r#type: String,
-    actor: String,
-    object: String,
+    id: String, //"https://podcastindex.social/users/dave/statuses/111689975521776545"
+    r#type: Option<String>, //"Note"
+    actor: Option<String>,
+    summary: Option<String>, //null
+    inReplyTo: Option<String>, //"https://podcastindex.social/users/dave/statuses/111683789181428177"
+    published: Option<String>, //"2024-01-03T03:49:36Z"
+    url: Option<String>, //"https://podcastindex.social/@dave/111689975521776545"
+    attributedTo: Option<String>, //"https://podcastindex.social/users/dave"
+    to: Option<Vec<String>>, //["https://www.w3.org/ns/activitystreams#Public" ]
+    cc: Option<Vec<String>>, //["https://podcastindex.social/users/dave/followers", "https://ap.podc...]"
+    sensitive: Option<bool>, //false
+    atomUri: Option<String>, //"https://podcastindex.social/users/dave/statuses/111689975521776545"
+    inReplyToAtomUri: Option<String>, //"https://podcastindex.social/users/dave/statuses/111683789181428177"
+    conversation: Option<String>, //"tag:ap.podcastindex.org,2023-12-30T05:02:50+00:00:objectId=podserve:f69b5c6c-6c16-43e5-a9d6-3f93a2756e48:objectType=Conversation",
+    content: Option<String>, //"\u003cp\u003e\u003cspan class=\"h-card\" translate=\"no\"\u003e\u003ca href=\"https://ap.podcastindex.org/podcasts?id=6594066\" class=\"u-url mention\"\u003e@\u003cspan\u003e6594066\u003c/span\u003e\u003c/a\u003e\u003c/span\u003e Another test. \u003ca href=\"https://podcastindex.social/tags/ignore\" class=\"mention hashtag\" rel=\"tag\"\u003e#\u003cspan\u003eignore\u003c/span\u003e\u003c/a\u003e\u003c/p\u003e",
+    attachment: Option<Vec<Attachment>>,
+    tag: Option<Vec<TagObject>>,
+    replies: Option<ReplyCollection>,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ReplyCollection {
+    id: Option<String>,
+    r#type: Option<String>,
+    first: Option<ReplyCollectionPage>,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ReplyCollectionPage {
+    id: Option<String>,
+    r#type: Option<String>,
+    next: Option<String>,
+    partOf: Option<String>,
 }
 
 #[allow(non_snake_case)]
@@ -401,8 +435,110 @@ impl fmt::Display for HydraError {
 
 impl Error for HydraError {}
 
+impl FromStr for InboxRequestObject {
+    // This implementation of `from_str` can never fail, so use the impossible
+    // `Void` type as the error type.
+    type Err = Void;
 
-//Functions --------------------------------------------------------------------------------------------------
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // Ok(Build {
+        //     context: s.to_string(),
+        //     dockerfile: None,
+        //     args: Map::new(),
+        // })
+        Ok(InboxRequestObject {
+            id: s.to_string(),
+            r#type: None,
+            actor: None,
+            summary: None,
+            inReplyTo: None,
+            published: None,
+            url: None,
+            attributedTo: None,
+            to: None,
+            cc: None,
+            sensitive: None,
+            atomUri: None,
+            inReplyToAtomUri: None,
+            conversation: None,
+            content: None,
+            attachment: None,
+            tag: None,
+            replies: None,
+        })
+    }
+}
+
+//Functions ------------------------------------------------------------------------------------------------------------
+fn d_blank_inboxrequest() -> InboxRequestObject {
+    InboxRequestObject {
+        id: "".to_string(),
+        r#type: None,
+        actor: None,
+        summary: None,
+        inReplyTo: None,
+        published: None,
+        url: None,
+        attributedTo: None,
+        to: None,
+        cc: None,
+        sensitive: None,
+        atomUri: None,
+        inReplyToAtomUri: None,
+        conversation: None,
+        content: None,
+        attachment: None,
+        tag: None,
+        replies: None,
+    }
+}
+
+fn de_optional_string_or_struct<'de, T, D>(deserializer: D) -> Result<T, D::Error>
+    where
+        T: Deserialize<'de> + FromStr<Err = Void>,
+        D: Deserializer<'de>,
+{
+    // This is a Visitor that forwards string types to T's `FromStr` impl and
+    // forwards map types to T's `Deserialize` impl. The `PhantomData` is to
+    // keep the compiler from complaining about T being an unused generic type
+    // parameter. We need T in order to know the Value type for the Visitor
+    // impl.
+    struct StringOrStruct<T>(PhantomData<fn() -> T>);
+
+    impl<'de, T> Visitor<'de> for StringOrStruct<T>
+        where
+            T: Deserialize<'de> + FromStr<Err = Void>,
+    {
+        type Value = T;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("string or map")
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<T, E>
+            where
+                E: de::Error,
+        {
+            Ok(FromStr::from_str(value).unwrap())
+        }
+
+        fn visit_map<M>(self, map: M) -> Result<T, M::Error>
+            where
+                M: MapAccess<'de>,
+        {
+            // `MapAccessDeserializer` is a wrapper that turns a `MapAccess`
+            // into a `Deserializer`, allowing it to be used as the input to T's
+            // `Deserialize` implementation. T then deserializes itself using
+            // the entries from the map visitor.
+            Deserialize::deserialize(de::value::MapAccessDeserializer::new(map))
+        }
+    }
+
+    deserializer.deserialize_any(StringOrStruct(PhantomData))
+}
+
+
+//Endpoints ------------------------------------------------------------------------------------------------------------
 pub async fn webfinger(ctx: Context) -> Response {
 
     //Get query parameters
@@ -434,7 +570,11 @@ pub async fn webfinger(ctx: Context) -> Response {
 
     //Lookup API of podcast
     let podcast_data: PIPodcast;
-    let api_response = api_get_podcast(API_KEY, API_SECRET, &podcast_guid).await;
+    let api_response = api_get_podcast(
+        &ctx.pi_auth.key,
+        &ctx.pi_auth.secret,
+        &podcast_guid
+    ).await;
     match api_response {
         Ok(response_body) => {
             //eprintln!("{:#?}", response_body);
@@ -546,7 +686,11 @@ pub async fn podcasts(ctx: Context) -> Response {
 
     //Lookup API of podcast
     let podcast_data: PIPodcast;
-    let api_response = api_get_podcast(API_KEY, API_SECRET, &podcast_guid).await;
+    let api_response = api_get_podcast(
+        &ctx.pi_auth.key,
+        &ctx.pi_auth.secret,
+        &podcast_guid
+    ).await;
     match api_response {
         Ok(response_body) => {
             //eprintln!("{:#?}", response_body);
@@ -654,7 +798,11 @@ pub async fn profiles(ctx: Context) -> Response {
 
     //Lookup API of podcast
     let podcast_data: PIPodcast;
-    let api_response = api_get_podcast(API_KEY, API_SECRET, &podcast_guid).await;
+    let api_response = api_get_podcast(
+        &ctx.pi_auth.key,
+        &ctx.pi_auth.secret,
+        &podcast_guid
+    ).await;
     match api_response {
         Ok(response_body) => {
             //eprintln!("{:#?}", response_body);
@@ -754,7 +902,11 @@ pub async fn outbox(ctx: Context) -> Response {
 
     //Lookup API of podcast
     let podcast_data: PIEpisodes;
-    let api_response = api_get_episodes(API_KEY, API_SECRET, &podcast_guid).await;
+    let api_response = api_get_episodes(
+        &ctx.pi_auth.key,
+        &ctx.pi_auth.secret,
+        &podcast_guid
+    ).await;
     match api_response {
         Ok(response_body) => {
             //eprintln!("{:#?}", response_body);
@@ -923,7 +1075,7 @@ pub async fn inbox(ctx: Context) -> Response {
     let podcast_guid = guid.clone();
 
 
-    //Is this a POST?
+    //##: POST REQUEST
     if http_action.to_lowercase() == "post" {
         //let following_actor;
         let (_parts, body) = ctx.req.into_parts();
@@ -933,7 +1085,7 @@ pub async fn inbox(ctx: Context) -> Response {
         println!("{}", body);
 
         let mut request_parsed = true;
-        let inbox_request = serde_json::from_str::<InboxRequest>(body);
+        let inbox_request = serde_json::from_str::<InboxRequestWithObject>(body);
         println!("Incoming request: {:#?}", inbox_request);
         match inbox_request {
             Ok(incoming_data) => {
@@ -944,7 +1096,7 @@ pub async fn inbox(ctx: Context) -> Response {
                     println!("--Follow request");
                     let client = reqwest::Client::new();
                     let response = client
-                        .get(&incoming_data.actor)
+                        .get(&incoming_data.actor.clone().unwrap())
                         .header(reqwest::header::USER_AGENT, "Podcast Index AP/v0.1.2a")
                         .header(reqwest::header::ACCEPT, "application/activity+json")
                         .send()
@@ -1015,6 +1167,7 @@ pub async fn inbox(ctx: Context) -> Response {
                                             }
                                         }
                                         Err(e) => {
+                                            println!("Acknowledging failed: [{}].\n", e);
                                             return hyper::Response::builder()
                                                 .status(StatusCode::from_u16(400).unwrap())
                                                 .body(format!("Acknowledging failed.").into())
@@ -1040,39 +1193,28 @@ pub async fn inbox(ctx: Context) -> Response {
                                 .unwrap();
                         }
                     }
-                }
-            }
-            Err(e) => {
-                println!("Could not parse incoming request: [{}].\n", e);
-                request_parsed = false;
-            }
-        }
 
-        if !request_parsed {
-            let inbox_request_alt = serde_json::from_str::<InboxRequestWithObject>(body);
-            println!("Incoming request: {:#?}", inbox_request_alt);
-            match inbox_request_alt {
-                Ok(incoming_data) => {
-                    request_parsed = true;
-                    if incoming_data.r#type.to_lowercase() == "undo"
-                        && incoming_data.object.r#type.to_lowercase() == "follow"
+                } else if incoming_data.r#type.to_lowercase() == "undo" {
+
+                    //##: Un-follow
+                    if incoming_data.object.r#type.is_some()
+                        && incoming_data.object.r#type.as_ref().unwrap().to_lowercase() == "follow"
                     {
                         dbif::remove_follower_from_db(&AP_DATABASE_FILE.to_string(), FollowerRecord {
                             pcid: podcast_guid.parse::<u64>().unwrap(),
-                            actor: incoming_data.actor,
+                            actor: incoming_data.actor.unwrap(),
                             instance: "".to_string(),
                             inbox: "".to_string(),
                             shared_inbox: "".to_string(),
                             status: "".to_string(),
                         });
                     }
+
                 }
-                Err(e) => {
-                    return hyper::Response::builder()
-                        .status(StatusCode::from_u16(400).unwrap())
-                        .body(format!("Error undoing.").into())
-                        .unwrap();
-                }
+            }
+            Err(e) => {
+                println!("Could not parse incoming request: [{}].\n", e);
+                request_parsed = false;
             }
         }
 
@@ -1237,7 +1379,8 @@ pub async fn episodes(ctx: Context) -> Response {
     }
 
     //If the status id was zero, then this is the pinned post
-    let mut episode_json = "".to_string();
+
+    let episode_json;
     if episode_guid == "0" {
         let episode_data = Status {
             at_context: vec!(
@@ -1290,8 +1433,8 @@ pub async fn episodes(ctx: Context) -> Response {
         //Lookup API of podcast
         let pi_data: PIEpisode;
         let api_response = api_get_episode(
-            API_KEY,
-            API_SECRET,
+            &ctx.pi_auth.key,
+            &ctx.pi_auth.secret,
             &podcast_guid,
             &episode_guid
         ).await;
@@ -1466,7 +1609,7 @@ pub async fn followers(ctx: Context) -> Response {
 
 
 //API calls --------------------------------------------------------------------------------------------------
-pub async fn api_get_podcast(key: &'static str, secret: &'static str, query: &str) -> Result<String, Box<dyn Error>> {
+pub async fn api_get_podcast(key: &str, secret: &str, query: &str) -> Result<String, Box<dyn Error>> {
     println!("PI API Request: /podcasts/byfeedid");
 
     let api_key = key;
@@ -1496,7 +1639,7 @@ pub async fn api_get_podcast(key: &'static str, secret: &'static str, query: &st
     let mut headers = header::HeaderMap::new();
     headers.insert("User-Agent", header::HeaderValue::from_static("Rust-podcastindex-org-example/v1.0"));
     headers.insert("X-Auth-Date", header::HeaderValue::from_str(api_time.as_str()).unwrap());
-    headers.insert("X-Auth-Key", header::HeaderValue::from_static(api_key));
+    headers.insert("X-Auth-Key", header::HeaderValue::from_str(api_key).unwrap());
     headers.insert("Authorization", header::HeaderValue::from_str(api_hash.as_str()).unwrap());
     let client = reqwest::Client::builder().default_headers(headers).build().unwrap();
 
@@ -1514,7 +1657,7 @@ pub async fn api_get_podcast(key: &'static str, secret: &'static str, query: &st
     }
 }
 
-pub async fn api_get_episodes(key: &'static str, secret: &'static str, query: &str) -> Result<String, Box<dyn Error>> {
+pub async fn api_get_episodes(key: &str, secret: &str, query: &str) -> Result<String, Box<dyn Error>> {
     println!("  PI API Request: /episodes/byfeedid");
 
     let api_key = key;
@@ -1544,7 +1687,7 @@ pub async fn api_get_episodes(key: &'static str, secret: &'static str, query: &s
     let mut headers = header::HeaderMap::new();
     headers.insert("User-Agent", header::HeaderValue::from_static("Rust-podcastindex-org-example/v1.0"));
     headers.insert("X-Auth-Date", header::HeaderValue::from_str(api_time.as_str()).unwrap());
-    headers.insert("X-Auth-Key", header::HeaderValue::from_static(api_key));
+    headers.insert("X-Auth-Key", header::HeaderValue::from_str(api_key).unwrap());
     headers.insert("Authorization", header::HeaderValue::from_str(api_hash.as_str()).unwrap());
     let client = reqwest::Client::builder().default_headers(headers).build().unwrap();
 
@@ -1562,7 +1705,7 @@ pub async fn api_get_episodes(key: &'static str, secret: &'static str, query: &s
     }
 }
 
-pub async fn api_get_episode(key: &'static str, secret: &'static str, query: &str, guid: &str) -> Result<String, Box<dyn Error>> {
+pub async fn api_get_episode(key: &str, secret: &str, query: &str, guid: &str) -> Result<String, Box<dyn Error>> {
     println!("  PI API Request: /episodes/byguid");
 
     let api_key = key;
@@ -1596,7 +1739,7 @@ pub async fn api_get_episode(key: &'static str, secret: &'static str, query: &st
     let mut headers = header::HeaderMap::new();
     headers.insert("User-Agent", header::HeaderValue::from_static("Rust-podcastindex-org-example/v1.0"));
     headers.insert("X-Auth-Date", header::HeaderValue::from_str(api_time.as_str()).unwrap());
-    headers.insert("X-Auth-Key", header::HeaderValue::from_static(api_key));
+    headers.insert("X-Auth-Key", header::HeaderValue::from_str(api_key).unwrap());
     headers.insert("Authorization", header::HeaderValue::from_str(api_hash.as_str()).unwrap());
     let client = reqwest::Client::builder().default_headers(headers).build().unwrap();
 
@@ -1614,7 +1757,7 @@ pub async fn api_get_episode(key: &'static str, secret: &'static str, query: &st
     }
 }
 
-pub fn api_block_get_episodes(key: &'static str, secret: &'static str, query: &str) -> Result<String, Box<dyn Error>> {
+pub fn api_block_get_episodes(key: &str, secret: &str, query: &str) -> Result<String, Box<dyn Error>> {
     println!("  PI API Request: /episodes/byfeedid");
 
     let api_key = key;
@@ -1644,7 +1787,7 @@ pub fn api_block_get_episodes(key: &'static str, secret: &'static str, query: &s
     let mut headers = header::HeaderMap::new();
     headers.insert("User-Agent", header::HeaderValue::from_static("Rust-podcastindex-org-example/v1.0"));
     headers.insert("X-Auth-Date", header::HeaderValue::from_str(api_time.as_str()).unwrap());
-    headers.insert("X-Auth-Key", header::HeaderValue::from_static(api_key));
+    headers.insert("X-Auth-Key", header::HeaderValue::from_str(api_key).unwrap());
     headers.insert("Authorization", header::HeaderValue::from_str(api_hash.as_str()).unwrap());
     let client = reqwest::blocking::Client::builder().default_headers(headers).build().unwrap();
 
@@ -1662,7 +1805,7 @@ pub fn api_block_get_episodes(key: &'static str, secret: &'static str, query: &s
     }
 }
 
-pub fn api_block_get_live_items(key: &'static str, secret: &'static str, query: &str) -> Result<String, Box<dyn Error>> {
+pub fn api_block_get_live_items(key: &str, secret: &str, query: &str) -> Result<String, Box<dyn Error>> {
     println!("  PI API Request: /live/byfeedurl");
 
     let api_key = key;
@@ -1692,7 +1835,7 @@ pub fn api_block_get_live_items(key: &'static str, secret: &'static str, query: 
     let mut headers = header::HeaderMap::new();
     headers.insert("User-Agent", header::HeaderValue::from_static("Rust-podcastindex-org-example/v1.0"));
     headers.insert("X-Auth-Date", header::HeaderValue::from_str(api_time.as_str()).unwrap());
-    headers.insert("X-Auth-Key", header::HeaderValue::from_static(api_key));
+    headers.insert("X-Auth-Key", header::HeaderValue::from_str(api_key).unwrap());
     headers.insert("Authorization", header::HeaderValue::from_str(api_hash.as_str()).unwrap());
     let client = reqwest::blocking::Client::builder().default_headers(headers).build().unwrap();
 
@@ -1781,15 +1924,19 @@ fn ap_build_actor_object(podcast_data: PIPodcast, actor_keys: ActorKeys) -> Resu
     });
 }
 
-fn ap_build_follow_accept(follow_request: InboxRequest, podcast_guid: u64) -> Result<InboxRequestAccept, Box<dyn Error>> {
-
+fn ap_build_follow_accept(follow_request: InboxRequestWithObject, podcast_guid: u64) -> Result<InboxRequestAccept, Box<dyn Error>> {
     return Ok(
         InboxRequestAccept {
             at_context: "https://www.w3.org/ns/activitystreams".to_string(),
             id: format!("https://ap.podcastindex.org/podcasts?id={}&context=accept", podcast_guid).to_string(),
             r#type: "Accept".to_string(),
-            actor: follow_request.object.clone(),
-            object: follow_request,
+            actor: follow_request.object.id.clone(),
+            object: InboxRequest {
+                id: follow_request.id.clone(),
+                r#type: follow_request.r#type.clone(),
+                actor: follow_request.actor.clone().unwrap(),
+                object: follow_request.object.id.clone(),
+            },
         }
     );
 }
