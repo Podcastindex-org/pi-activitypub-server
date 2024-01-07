@@ -75,7 +75,7 @@ pub struct Podping {
     pub iris: Vec<String>,
     pub medium: String,
     pub reason: String,
-    pub sessionId: String,
+    pub sessionId: Option<String>,
     pub timestampNs: u64,
     pub version: String,
 }
