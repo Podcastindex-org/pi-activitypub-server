@@ -73,11 +73,11 @@ pub struct PodpingPayload {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Podping {
     pub iris: Vec<String>,
-    pub medium: String,
+    pub medium: Option<String>,
     pub reason: String,
     pub sessionId: Option<String>,
-    pub timestampNs: u64,
-    pub version: String,
+    pub timestampNs: Option<u64>,
+    pub version: Option<String>,
 }
 
 #[allow(non_snake_case)]
