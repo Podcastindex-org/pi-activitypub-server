@@ -1069,7 +1069,11 @@ pub async fn inbox(ctx: Context) -> Response {
             guid = parts.split("@").next().unwrap().to_string();
         }
         None => {
-            println!("Invalid resource.\n");
+            eprintln!("Invalid resource: [{}]: [{}] from: {:#?}",
+                     http_action,
+                     ctx.req.uri(),
+                     ctx.req.headers().get("user-agent")
+            );
             return hyper::Response::builder()
                 .status(StatusCode::from_u16(400).unwrap())
                 .body(format!("No resource given.").into())
@@ -1078,7 +1082,6 @@ pub async fn inbox(ctx: Context) -> Response {
     }
     let podcast_guid = guid.clone();
 
-
     //##: POST REQUEST
     if http_action.to_lowercase() == "post" {
         //let following_actor;
@@ -1086,16 +1089,14 @@ pub async fn inbox(ctx: Context) -> Response {
         let body_bytes = hyper::body::to_bytes(body).await.unwrap();
         let body = std::str::from_utf8(&body_bytes).unwrap();
 
-        let mut request_parsed = true;
         let inbox_request = serde_json::from_str::<InboxRequestWithObject>(body);
         match inbox_request {
             Ok(incoming_data) => {
                 //TODO: This should all be in separate functions
-                //TODO: If this incoming request is a verb other than follow, a different struct should be used
-                //TODO: ...for decoding, like a Create struct for the object data
                 if incoming_data.r#type.to_lowercase() == "delete" {
                     //TODO: Ignoring this for now
                     println!("--Delete request");
+
                 } else if incoming_data.r#type.to_lowercase() == "follow" {
                     println!("--Follow request");
                     let client = reqwest::Client::new();
@@ -1120,7 +1121,7 @@ pub async fn inbox(ctx: Context) -> Response {
                                             accept_data = data;
                                         }
                                         Err(e) => {
-                                            println!("Build follow accept error: [{:#?}].\n", e);
+                                            eprintln!("Build follow accept error: [{:#?}].\n", e);
                                             return hyper::Response::builder()
                                                 .status(StatusCode::from_u16(500).unwrap())
                                                 .body(format!("Accept build error.").into())
@@ -1133,7 +1134,7 @@ pub async fn inbox(ctx: Context) -> Response {
                                             _accept_json = json_result;
                                         }
                                         Err(e) => {
-                                            println!("Response prep error: [{:#?}].\n", e);
+                                            eprintln!("Response prep error: [{:#?}].\n", e);
                                             return hyper::Response::builder()
                                                 .status(StatusCode::from_u16(500).unwrap())
                                                 .body(format!("Accept encode error.").into())
@@ -1171,7 +1172,7 @@ pub async fn inbox(ctx: Context) -> Response {
                                             }
                                         }
                                         Err(e) => {
-                                            println!("Acknowledging failed: [{}].\n", e);
+                                            eprintln!("Acknowledging failed: [{}].\n", e);
                                             return hyper::Response::builder()
                                                 .status(StatusCode::from_u16(400).unwrap())
                                                 .body(format!("Acknowledging failed.").into())
@@ -1181,7 +1182,7 @@ pub async fn inbox(ctx: Context) -> Response {
 
                                 }
                                 Err(e) => {
-                                    println!("Bad actor: [{}].\n", e);
+                                    eprintln!("Bad actor: [{}].\n", e);
                                     return hyper::Response::builder()
                                         .status(StatusCode::from_u16(400).unwrap())
                                         .body(format!("Bad actor.").into())
@@ -1190,7 +1191,7 @@ pub async fn inbox(ctx: Context) -> Response {
                             }
                         }
                         Err(e) => {
-                            println!("Bad actor: [{}].\n", e);
+                            eprintln!("Bad actor: [{}].\n", e);
                             return hyper::Response::builder()
                                 .status(StatusCode::from_u16(400).unwrap())
                                 .body(format!("Bad actor.").into())
@@ -1214,24 +1215,19 @@ pub async fn inbox(ctx: Context) -> Response {
                         });
                     }
                 } else {
-                    println!("--Unhandled request type");
-                    println!("Incoming request: {:#?}", incoming_data);
-                    println!("BODY: {}", body);
+                    eprintln!("--Unhandled request type");
+                    eprintln!("  Incoming request: {:#?}", incoming_data);
+                    eprintln!("  BODY: {}", body);
                 }
             }
             Err(e) => {
-                println!("Could not parse incoming request: [{}].\n", e);
-                request_parsed = false;
+                eprintln!("Could not parse incoming request: [{}].\n", e);
+                return hyper::Response::builder()
+                    .status(StatusCode::from_u16(400).unwrap())
+                    .body(format!("Invalid request format.").into())
+                    .unwrap();
             }
         }
-
-        if !request_parsed {
-            return hyper::Response::builder()
-                .status(StatusCode::from_u16(400).unwrap())
-                .body(format!("Invalid request format.").into())
-                .unwrap();
-        }
-
     }
 
     //TODO: validate the key signature before accepting request
@@ -2029,6 +2025,7 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
             private_key = pem_decoded_privkey;
         }
         Err(e) => {
+            eprintln!("Error decoding private key: [{}] for actor: [{}]", e, podcast_guid);
             return Err(Box::new(HydraError(format!("Error decoding private key: [{}]", e).into())));
         }
     }
@@ -2040,6 +2037,7 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
             post_body = json_result;
         }
         Err(e) => {
+            eprintln!("Error building post body: [{}]", e);
             return Err(Box::new(HydraError(format!("Error building post body: [{}]", e).into())));
         }
     }
@@ -2058,6 +2056,7 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
             http_signature_headers = sig_headers;
         }
         Err(e) => {
+            eprintln!("Could not build http signature headers: [{}]", e);
             return Err(Box::new(HydraError(format!("Could not build http signature headers: [{}]", e).into())));
         }
     }
@@ -2089,7 +2088,7 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
                 return Ok("".to_string());
             } else {
                 let res_body = res.text().await?;
-                println!("  Body: [{:#?}]", res_body);
+                eprintln!("  Body: [{:#?}]", res_body);
                 return Err(Box::new(HydraError(format!("Accepting the follow request failed.").into())));
             }
 
