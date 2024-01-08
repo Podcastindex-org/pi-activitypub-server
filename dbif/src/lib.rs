@@ -25,12 +25,12 @@ pub struct BoostRecord {
 
 impl BoostRecord {
     //Removes unsafe html interpretable characters from displayable strings
-    pub fn escape_for_html( field: String) -> String {
+    pub fn escape_for_html(field: String) -> String {
         return field.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
     //Removes unsafe html interpretable characters from displayable strings
-    pub fn escape_for_csv( field: String) -> String {
+    pub fn escape_for_csv(field: String) -> String {
         return field.replace("\"", "\"\"").replace("\n", " ");
     }
 
@@ -62,11 +62,13 @@ pub struct FollowerRecord {
 
 #[derive(Debug)]
 struct HydraError(String);
+
 impl fmt::Display for HydraError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Fatal error: {}", self.0)
     }
 }
+
 impl Error for HydraError {}
 
 
@@ -75,7 +77,7 @@ fn connect_to_database(init: bool, filepath: &String) -> Result<Connection, Box<
     if let Ok(conn) = Connection::open(filepath.as_str()) {
         if init {
             match set_database_file_permissions(filepath.as_str()) {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(e) => {
                     eprintln!("{:#?}", e);
                 }
@@ -84,14 +86,13 @@ fn connect_to_database(init: bool, filepath: &String) -> Result<Connection, Box<
         }
         Ok(conn)
     } else {
-        return Err(Box::new(HydraError(format!("Could not open a database file at: [{}].", filepath).into())))
+        return Err(Box::new(HydraError(format!("Could not open a database file at: [{}].", filepath).into())));
     }
 }
 
 
 //Set permissions on the database files
 fn set_database_file_permissions(filepath: &str) -> Result<bool, Box<dyn Error>> {
-
     match std::fs::File::open(filepath) {
         Ok(fh) => {
             match fh.metadata() {
@@ -100,14 +101,14 @@ fn set_database_file_permissions(filepath: &str) -> Result<bool, Box<dyn Error>>
                     perms.set_mode(0o666);
                     println!("Set file permission to: [666] on database file: [{}]", filepath);
                     Ok(true)
-                },
+                }
                 Err(e) => {
-                    return Err(Box::new(HydraError(format!("Error getting metadata from database file handle: [{}].  Error: {:#?}.", filepath, e).into())))
+                    return Err(Box::new(HydraError(format!("Error getting metadata from database file handle: [{}].  Error: {:#?}.", filepath, e).into())));
                 }
             }
-        },
+        }
         Err(e) => {
-            return Err(Box::new(HydraError(format!("Error opening database file handle: [{}] for permissions setting.  Error: {:#?}.", filepath, e).into())))
+            return Err(Box::new(HydraError(format!("Error opening database file handle: [{}] for permissions setting.  Error: {:#?}.", filepath, e).into())));
         }
     }
 }
@@ -133,7 +134,7 @@ pub fn create_database(filepath: &String) -> Result<bool, Box<dyn Error>> {
         }
         Err(e) => {
             eprintln!("{}", e);
-            return Err(Box::new(HydraError(format!("Failed to create database actors table: [{}].", filepath).into())))
+            return Err(Box::new(HydraError(format!("Failed to create database actors table: [{}].", filepath).into())));
         }
     }
 
@@ -147,7 +148,7 @@ pub fn create_database(filepath: &String) -> Result<bool, Box<dyn Error>> {
         }
         Err(e) => {
             eprintln!("{}", e);
-            return Err(Box::new(HydraError(format!("Failed to create database actors indexes: [{}].", filepath).into())))
+            return Err(Box::new(HydraError(format!("Failed to create database actors indexes: [{}].", filepath).into())));
         }
     }
 
@@ -168,7 +169,7 @@ pub fn create_database(filepath: &String) -> Result<bool, Box<dyn Error>> {
         }
         Err(e) => {
             eprintln!("{}", e);
-            return Err(Box::new(HydraError(format!("Failed to create database followers table: [{}].", filepath).into())))
+            return Err(Box::new(HydraError(format!("Failed to create database followers table: [{}].", filepath).into())));
         }
     }
 
@@ -182,7 +183,7 @@ pub fn create_database(filepath: &String) -> Result<bool, Box<dyn Error>> {
         }
         Err(e) => {
             eprintln!("{}", e);
-            return Err(Box::new(HydraError(format!("Failed to create database followers index: [{}].", filepath).into())))
+            return Err(Box::new(HydraError(format!("Failed to create database followers index: [{}].", filepath).into())));
         }
     }
 
@@ -195,7 +196,7 @@ pub fn create_database(filepath: &String) -> Result<bool, Box<dyn Error>> {
         }
         Err(e) => {
             eprintln!("{}", e);
-            return Err(Box::new(HydraError(format!("Failed to create database followers index: [{}].", filepath).into())))
+            return Err(Box::new(HydraError(format!("Failed to create database followers index: [{}].", filepath).into())));
         }
     }
 
@@ -208,7 +209,7 @@ pub fn create_database(filepath: &String) -> Result<bool, Box<dyn Error>> {
         }
         Err(e) => {
             eprintln!("{}", e);
-            return Err(Box::new(HydraError(format!("Failed to create database followers index: [{}].", filepath).into())))
+            return Err(Box::new(HydraError(format!("Failed to create database followers index: [{}].", filepath).into())));
         }
     }
 
@@ -221,7 +222,7 @@ pub fn create_database(filepath: &String) -> Result<bool, Box<dyn Error>> {
         }
         Err(e) => {
             eprintln!("{}", e);
-            return Err(Box::new(HydraError(format!("Failed to create database followers index: [{}].", filepath).into())))
+            return Err(Box::new(HydraError(format!("Failed to create database followers index: [{}].", filepath).into())));
         }
     }
 
@@ -247,17 +248,18 @@ pub fn add_actor_to_db(filepath: &String, actor: ActorRecord) -> Result<bool, Bo
                            actor.pem_private_key,
                            actor.pem_public_key,
                            actor.last_episode_guid
-                       ]
+                       ],
     ) {
         Ok(_) => {
             Ok(true)
         }
         Err(e) => {
             eprintln!("{}", e);
-            return Err(Box::new(HydraError(format!("Failed to add actor: [{}].", actor.pcid).into())))
+            return Err(Box::new(HydraError(format!("Failed to add actor: [{}].", actor.pcid).into())));
         }
     }
 }
+
 pub fn update_actor_last_episode_guid_in_db(filepath: &String, pcid: u64, episode_guid: String) -> Result<bool, Box<dyn Error>> {
     let conn = connect_to_database(false, filepath)?;
 
@@ -267,17 +269,18 @@ pub fn update_actor_last_episode_guid_in_db(filepath: &String, pcid: u64, episod
                        params![
                            episode_guid,
                            pcid,
-                       ]
+                       ],
     ) {
         Ok(_) => {
             Ok(true)
         }
         Err(e) => {
             eprintln!("{}", e);
-            return Err(Box::new(HydraError(format!("Failed to update guid: [{}] for pcid: [{}].", episode_guid, pcid).into())))
+            return Err(Box::new(HydraError(format!("Failed to update guid: [{}] for pcid: [{}].", episode_guid, pcid).into())));
         }
     }
 }
+
 pub fn get_actor_from_db(filepath: &String, pcid: u64) -> Result<ActorRecord, Box<dyn Error>> {
     let conn = connect_to_database(false, filepath)?;
     let mut actors: Vec<ActorRecord> = Vec::new();
@@ -294,7 +297,7 @@ pub fn get_actor_from_db(filepath: &String, pcid: u64) -> Result<ActorRecord, Bo
                                  WHERE pcid = :pcid \
                                  ORDER BY pcid DESC \
                                  LIMIT :max")?;
-    let rows = stmt.query_map(&[(":max", max.to_string().as_str()),(":pcid", pcid.to_string().as_str())], |row| {
+    let rows = stmt.query_map(&[(":max", max.to_string().as_str()), (":pcid", pcid.to_string().as_str())], |row| {
         Ok(ActorRecord {
             pcid: row.get(0)?,
             guid: row.get(1)?,
@@ -317,6 +320,7 @@ pub fn get_actor_from_db(filepath: &String, pcid: u64) -> Result<ActorRecord, Bo
 
     Err(Box::new(HydraError(format!("Failed to get actor: [{}].", pcid).into())))
 }
+
 pub fn get_actors_from_db(filepath: &String) -> Result<Vec<ActorRecord>, Box<dyn Error>> {
     let conn = connect_to_database(false, filepath)?;
     let mut actors: Vec<ActorRecord> = Vec::new();
@@ -377,17 +381,18 @@ pub fn add_follower_to_db(filepath: &String, follower: FollowerRecord) -> Result
                            follower.inbox,
                            follower.shared_inbox,
                            follower.status
-                       ]
+                       ],
     ) {
         Ok(_) => {
             Ok(true)
         }
         Err(e) => {
             eprintln!("{}", e);
-            return Err(Box::new(HydraError(format!("Failed to add follower: [{}].", follower.actor).into())))
+            return Err(Box::new(HydraError(format!("Failed to add follower: [{}].", follower.actor).into())));
         }
     }
 }
+
 pub fn remove_follower_from_db(filepath: &String, follower: FollowerRecord) -> Result<bool, Box<dyn Error>> {
     let conn = connect_to_database(false, filepath)?;
 
@@ -395,17 +400,18 @@ pub fn remove_follower_from_db(filepath: &String, follower: FollowerRecord) -> R
                        params![
                            follower.pcid,
                            follower.actor,
-                       ]
+                       ],
     ) {
         Ok(_) => {
             Ok(true)
         }
         Err(e) => {
             eprintln!("{}", e);
-            return Err(Box::new(HydraError(format!("Failed to remove follower: [{}].", follower.actor).into())))
+            return Err(Box::new(HydraError(format!("Failed to remove follower: [{}].", follower.actor).into())));
         }
     }
 }
+
 pub fn get_followers_from_db(filepath: &String, pcid: u64) -> Result<Vec<FollowerRecord>, Box<dyn Error>> {
     let conn = connect_to_database(false, filepath)?;
     let mut followers: Vec<FollowerRecord> = Vec::new();
@@ -423,16 +429,21 @@ pub fn get_followers_from_db(filepath: &String, pcid: u64) -> Result<Vec<Followe
                                  WHERE pcid = :pcid \
                                  ORDER BY instance DESC \
                                  LIMIT :max")?;
-    let rows = stmt.query_map(&[(":max", max.to_string().as_str()),(":pcid", pcid.to_string().as_str())], |row| {
-        Ok(FollowerRecord {
-            pcid: row.get(0)?,
-            actor: row.get(1)?,
-            instance: row.get(2)?,
-            inbox: row.get(3)?,
-            shared_inbox: row.get(4)?,
-            status: row.get(5)?,
-        })
-    }).unwrap();
+    let rows = stmt.query_map(
+        &[
+            (":max", max.to_string().as_str()),
+            (":pcid", pcid.to_string().as_str())
+        ],
+        |row| {
+            Ok(FollowerRecord {
+                pcid: row.get(0)?,
+                actor: row.get(1)?,
+                instance: row.get(2)?,
+                inbox: row.get(3)?,
+                shared_inbox: row.get(4)?,
+                status: row.get(5)?,
+            })
+        }).unwrap();
 
     //Parse the results
     for row in rows {
@@ -440,21 +451,11 @@ pub fn get_followers_from_db(filepath: &String, pcid: u64) -> Result<Vec<Followe
         followers.push(follower);
     }
 
-    if followers.len() > 0 {
-        return Ok(followers.clone());
-    }
+    return Ok(followers.clone());
 
 
-    Err(Box::new(HydraError(format!("Failed to get followers for: [{}].", pcid).into())))
+    //Err(Box::new(HydraError(format!("Failed to get followers for: [{}].", pcid).into())))
 }
-
-
-
-
-
-
-
-
 
 
 // //Get all of the boosts from the database
