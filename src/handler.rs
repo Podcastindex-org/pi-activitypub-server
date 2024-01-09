@@ -1541,31 +1541,8 @@ pub async fn episodes(ctx: Context) -> Response {
 
 pub async fn contexts(ctx: Context) -> Response {
 
-    //Get query parameters
-    // let params: HashMap<String, String> = ctx.req.uri().query().map(|v| {
-    //     url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
-    // }).unwrap_or_else(HashMap::new);
-
     println!("\n\n----------");
     println!("Request: {} from: {:#?}", ctx.req.uri(), ctx.req.headers().get("user-agent"));
-
-    //Make sure a session param was given
-    // let guid;
-    // match params.get("id") {
-    //     Some(resource) => {
-    //         println!("  Id: {}\n", resource);
-    //         let parts = resource.replace("acct:", "");
-    //         guid = parts.split("@").next().unwrap().to_string();
-    //     }
-    //     None => {
-    //         println!("Invalid resource.\n");
-    //         return hyper::Response::builder()
-    //             .status(StatusCode::from_u16(400).unwrap())
-    //             .body(format!("No resource given.").into())
-    //             .unwrap();
-    //     }
-    // }
-    // let podcast_guid = guid.clone();
 
     return hyper::Response::builder()
         .status(StatusCode::OK)
@@ -1576,31 +1553,8 @@ pub async fn contexts(ctx: Context) -> Response {
 
 pub async fn followers(ctx: Context) -> Response {
 
-    //Get query parameters
-    // let params: HashMap<String, String> = ctx.req.uri().query().map(|v| {
-    //     url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
-    // }).unwrap_or_else(HashMap::new);
-
     println!("\n\n----------");
     println!("Request: {} from: {:#?}", ctx.req.uri(), ctx.req.headers().get("user-agent"));
-
-    //Make sure a session param was given
-    // let guid;
-    // match params.get("id") {
-    //     Some(resource) => {
-    //         println!("  Id: {}\n", resource);
-    //         let parts = resource.replace("acct:", "");
-    //         guid = parts.split("@").next().unwrap().to_string();
-    //     }
-    //     None => {
-    //         println!("Invalid resource.\n");
-    //         return hyper::Response::builder()
-    //             .status(StatusCode::from_u16(400).unwrap())
-    //             .body(format!("No resource given.").into())
-    //             .unwrap();
-    //     }
-    // }
-    // let podcast_guid = guid.clone();
 
     return hyper::Response::builder()
         .status(StatusCode::OK)
