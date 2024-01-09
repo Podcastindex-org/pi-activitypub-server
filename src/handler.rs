@@ -116,21 +116,21 @@ pub struct Actor {
     r#type: String,
     discoverable: bool,
     indexable: Option<bool>,
-    preferredUsername: String,
+    preferredUsername: Option<String>,
     published: Option<String>,
     memorial: Option<bool>,
     devices: Option<String>,
     //tag: Vec<String>,
-    name: String,
+    name: Option<String>,
     inbox: String,
     outbox: String,
-    featured: String,
-    followers: String,
-    following: String,
+    featured: Option<String>,
+    followers: Option<String>,
+    following: Option<String>,
     icon: Option<Icon>,
-    summary: String,
-    url: String,
-    manuallyApprovesFollowers: bool,
+    summary: Option<String>,
+    url: Option<String>,
+    manuallyApprovesFollowers: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     attachment: Option<Vec<Attachment>>,
     publicKey: PublicKey,
@@ -537,6 +537,13 @@ fn de_optional_string_or_struct<'de, T, D>(deserializer: D) -> Result<T, D::Erro
     deserializer.deserialize_any(StringOrStruct(PhantomData))
 }
 
+fn d_blank() -> Option<String> {
+    None
+}
+
+fn d_zero() -> Option<u64> {
+    None
+}
 
 //Endpoints ------------------------------------------------------------------------------------------------------------
 pub async fn webfinger(ctx: Context) -> Response {
@@ -1868,19 +1875,19 @@ fn ap_build_actor_object(podcast_data: PIPodcast, actor_keys: ActorKeys) -> Resu
         id: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
         r#type: "Person".to_string(),
         discoverable: true,
-        preferredUsername: podcast_guid.to_string(),
-        name: format!("{:.48}", podcast_data.feed.title).to_string(),
+        preferredUsername: Some(podcast_guid.to_string()),
+        name: Some(format!("{:.48}", podcast_data.feed.title).to_string()),
         inbox: format!("https://ap.podcastindex.org/inbox?id={}", podcast_guid).to_string(),
         outbox: format!("https://ap.podcastindex.org/outbox?id={}", podcast_guid).to_string(),
-        featured: format!("https://ap.podcastindex.org/featured?id={}", podcast_guid).to_string(),
-        followers: format!("https://ap.podcastindex.org/followers?id={}", podcast_guid).to_string(),
-        following: format!("https://ap.podcastindex.org/following?id={}", podcast_guid).to_string(),
+        featured: Some(format!("https://ap.podcastindex.org/featured?id={}", podcast_guid).to_string()),
+        followers: Some(format!("https://ap.podcastindex.org/followers?id={}", podcast_guid).to_string()),
+        following: Some(format!("https://ap.podcastindex.org/following?id={}", podcast_guid).to_string()),
         icon: Some(Icon {
             r#type: "Image".to_string(),
             mediaType: None,
             url: format!("{}", podcast_data.feed.image).to_string(),
         }),
-        summary: format!("{:.96}", podcast_data.feed.description),
+        summary: Some(format!("{:.96}", podcast_data.feed.description)),
         attachment: Some(vec!(
             Attachment {
                 name: "Index".to_string(),
@@ -1917,8 +1924,8 @@ fn ap_build_actor_object(podcast_data: PIPodcast, actor_keys: ActorKeys) -> Resu
         endpoints: Endpoints {
             sharedInbox: "https://ap.podcastindex.org/inbox?id=0".to_string(),
         },
-        url: format!("https://podcastindex.org/podcast/{}", podcast_guid).to_string(),
-        manuallyApprovesFollowers: false,
+        url: Some(format!("https://podcastindex.org/podcast/{}", podcast_guid).to_string()),
+        manuallyApprovesFollowers: Some(false),
         indexable: Some(true),
         memorial: Some(false),
         published: Some("2023-11-09T15:56:28.495803Z".to_string()),
