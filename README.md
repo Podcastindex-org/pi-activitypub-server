@@ -12,3 +12,14 @@ cargo build --release && ./target/release/pi-activitypub-server 80 1
 ```
 
 The bridge requires a Podcast Index API key set to be present in the environment, as noted above.
+
+## Operation
+
+Followers of podcasts are recorded and when new episodes are posted a Note is sent.  A Note is also sent when 
+podcasts go live, by watching the LiveWire Podping websocket.
+
+## To-do
+
+- Watch for replies and return them in the episode status
+- Note content cleanup
+- AS2 object for media references
