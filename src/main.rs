@@ -28,7 +28,8 @@ mod base64;
 
 const LOOP_TIMER_MILLISECONDS: u64 = 60000;
 const AP_DATABASE_FILE: &str = "database.db";
-const USER_AGENT_PARAM: &str = concat!("Podcast Index AP-Bridge", env!("CARGO_PKG_VERSION"));
+const USER_AGENT_PARAM: &str = concat!("PodcastIndexAPBridge_v", env!("CARGO_PKG_VERSION"));
+//const USER_AGENT_HEADER: &str = concat!("Podcast Index AP-Bridge/v", env!("CARGO_PKG_VERSION"));
 
 type Response = hyper::Response<hyper::Body>;
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -367,6 +368,7 @@ fn live_item_tracker(api_key: String, api_secret: String) {
     ).expect("Can't connect to podping socket.");
 
     loop {
+        #[allow(deprecated)]
         let msg = socket.read_message().expect("Error reading message");
         //println!(" Podping Received: {:#?}", msg.to_text().unwrap());
         match serde_json::from_str(msg.to_text().unwrap()) {

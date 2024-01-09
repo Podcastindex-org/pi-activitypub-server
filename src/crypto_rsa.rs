@@ -130,6 +130,7 @@ pub fn create_rsa_sha256_signature(
     private_key: &RsaPrivateKey,
     message: &str,
 ) -> Result<Vec<u8>, RsaError> {
+    #[allow(deprecated)]
     let signing_key = SigningKey::<Sha256>::new_with_prefix(private_key.clone());
     let signature = signing_key.sign(message.as_bytes());
     Ok(signature.to_vec())
@@ -140,6 +141,7 @@ pub fn verify_rsa_sha256_signature(
     message: &str,
     signature: &[u8],
 ) -> bool {
+    #[allow(deprecated)]
     let verifying_key = VerifyingKey::<Sha256>::new_with_prefix(public_key.clone());
     let signature = match Signature::try_from(signature) {
         Ok(signature) => signature,
