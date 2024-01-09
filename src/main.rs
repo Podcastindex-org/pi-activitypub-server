@@ -319,7 +319,7 @@ fn episode_tracker(api_key: String, api_secret: String) {
                 }
             }
 
-            thread::sleep(Duration::from_millis(3000));
+            thread::sleep(Duration::from_millis(1000));
         }
     }
 }
