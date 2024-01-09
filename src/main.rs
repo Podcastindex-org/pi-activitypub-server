@@ -4,6 +4,7 @@ use router::Router;
 use std::sync::Arc;
 use hyper::server::conn::AddrStream;
 use std::env;
+use std::string::ToString;
 use std::thread;
 use std::time::{Duration};
 use serde::{Deserialize, Serialize};
@@ -27,6 +28,7 @@ mod base64;
 
 const LOOP_TIMER_MILLISECONDS: u64 = 60000;
 const AP_DATABASE_FILE: &str = "database.db";
+const USER_AGENT_PARAM: &str = concat!("Podcast Index AP-Bridge", env!("CARGO_PKG_VERSION"));
 
 type Response = hyper::Response<hyper::Body>;
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -361,7 +363,7 @@ fn live_item_tracker(api_key: String, api_secret: String) {
 
     //##: TODO - reconnect socket if it falls down
     let (mut socket, _response) = connect(
-        Url::parse("wss://api.livewire.io/ws/podping").unwrap()
+        Url::parse(format!("wss://api.livewire.io/ws/podping?agent={}", USER_AGENT_PARAM).as_str()).unwrap()
     ).expect("Can't connect to podping socket.");
 
     loop {
