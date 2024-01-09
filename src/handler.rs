@@ -537,13 +537,6 @@ fn de_optional_string_or_struct<'de, T, D>(deserializer: D) -> Result<T, D::Erro
     deserializer.deserialize_any(StringOrStruct(PhantomData))
 }
 
-fn d_blank() -> Option<String> {
-    None
-}
-
-fn d_zero() -> Option<u64> {
-    None
-}
 
 //Endpoints ------------------------------------------------------------------------------------------------------------
 pub async fn webfinger(ctx: Context) -> Response {
@@ -1212,7 +1205,7 @@ pub async fn inbox(ctx: Context) -> Response {
                     if incoming_data.object.r#type.is_some()
                         && incoming_data.object.r#type.as_ref().unwrap().to_lowercase() == "follow"
                     {
-                        dbif::remove_follower_from_db(&AP_DATABASE_FILE.to_string(), FollowerRecord {
+                        let _ = dbif::remove_follower_from_db(&AP_DATABASE_FILE.to_string(), FollowerRecord {
                             pcid: podcast_guid.parse::<u64>().unwrap(),
                             actor: incoming_data.actor.unwrap(),
                             instance: "".to_string(),

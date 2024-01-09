@@ -131,13 +131,41 @@ async fn main() {
     let env_tracker_pi_api_key = env_pi_api_key.clone();
     let env_tracker_pi_api_secret = env_pi_api_secret.clone();
     thread::spawn(move || {
-        episode_tracker(env_tracker_pi_api_key, env_tracker_pi_api_secret);
+        loop {
+            let key = env_tracker_pi_api_key.clone();
+            let secret = env_tracker_pi_api_secret.clone();
+            let thread_handle = thread::spawn(move || {
+                episode_tracker(key, secret);
+            });
+            match thread_handle.join() {
+                Ok(_) => {
+                    println!("*****Episode Tracker Thread Exited*****");
+                }
+                Err(e) => {
+                    eprintln!("*****Episode Tracker Thread Exited*****:  [{:#?}]", e);
+                }
+            }
+        }
     });
 
     let env_live_pi_api_key = env_pi_api_key.clone();
     let env_live_pi_api_secret = env_pi_api_secret.clone();
     thread::spawn(move || {
-        live_item_tracker(env_live_pi_api_key, env_live_pi_api_secret)
+        loop {
+            let key = env_live_pi_api_key.clone();
+            let secret = env_live_pi_api_secret.clone();
+            let thread_handle = thread::spawn(move || {
+                live_item_tracker(key, secret);
+            });
+            match thread_handle.join() {
+                Ok(_) => {
+                    println!("*****Live Tracker Thread Exited*****");
+                }
+                Err(e) => {
+                    eprintln!("*****Live Tracker Thread Exited*****:  [{:#?}]", e);
+                }
+            }
+        }
     });
 
     let some_state = "state".to_string();
@@ -168,7 +196,7 @@ async fn main() {
             key: env_pi_api_key.clone(),
             secret: env_pi_api_secret.clone(),
         };
-        let main_version = version.clone().to_string();
+        let main_version = version.to_string();
         async {
             Ok::<_, Error>(service_fn(move |req| {
                 route(
@@ -285,7 +313,7 @@ fn episode_tracker(api_key: String, api_secret: String) {
                                             let mut shared_inboxes_called = Vec::new();
                                             for follower in followers {
                                                 if !shared_inboxes_called.contains(&follower.shared_inbox) {
-                                                    ap_block_send_note(
+                                                    let _ = ap_block_send_note(
                                                         actor.pcid,
                                                         latest_episode_details,
                                                         follower.shared_inbox.clone(),
@@ -295,7 +323,7 @@ fn episode_tracker(api_key: String, api_secret: String) {
                                             }
 
 
-                                            dbif::update_actor_last_episode_guid_in_db(
+                                            let _ = dbif::update_actor_last_episode_guid_in_db(
                                                 &AP_DATABASE_FILE.to_string(),
                                                 actor.pcid,
                                                 latest_episode_details.guid.clone(),
@@ -304,16 +332,19 @@ fn episode_tracker(api_key: String, api_secret: String) {
                                     }
                                 }
                                 Err(e) => {
+                                    //TODO - refactor this deep nesting
                                     eprintln!("  API response prep error: [{:#?}].\n", e);
                                 }
                             }
                         }
                         Err(e) => {
+                            //TODO - refactor this deep nesting
                             eprintln!("  API call error: [{:#?}].\n", e);
                         }
                     }
                 }
                 Err(e) => {
+                    //TODO - refactor this deep nesting
                     eprintln!("  Error getting followers from the database: [{:#?}]", e);
                     continue;
                 }
@@ -329,7 +360,7 @@ fn live_item_tracker(api_key: String, api_secret: String) {
     println!("PODPING: Connected to podping socket.");
 
     //##: TODO - reconnect socket if it falls down
-    let (mut socket, response) = connect(
+    let (mut socket, _response) = connect(
         Url::parse("wss://api.livewire.io/ws/podping").unwrap()
     ).expect("Can't connect to podping socket.");
 
@@ -369,7 +400,7 @@ fn live_item_tracker(api_key: String, api_secret: String) {
                                                         let mut shared_inboxes_called = Vec::new();
                                                         for follower in followers {
                                                             if !shared_inboxes_called.contains(&follower.shared_inbox) {
-                                                                ap_block_send_live_note(
+                                                                let _ = ap_block_send_live_note(
                                                                     live_item.feedId,
                                                                     &live_item,
                                                                     follower.shared_inbox.clone(),
@@ -378,21 +409,21 @@ fn live_item_tracker(api_key: String, api_secret: String) {
                                                             }
                                                         }
                                                     }
-                                                    Err(e) => {
-
+                                                    Err(_e) => {
+                                                        //TODO - refactor this deep nesting
                                                     }
                                                 }
                                                 break;
                                             }
                                         }
                                     }
-                                    Err(e) => {
-
+                                    Err(_e) => {
+                                        //TODO - refactor this deep nesting
                                     }
                                 }
                             }
-                            Err(e) => {
-
+                            Err(_e) => {
+                                //TODO - refactor this deep nesting
                             }
                         }
 

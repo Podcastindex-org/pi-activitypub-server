@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 /// Wrapper for base64 crate
 /// https://github.com/marshallpierce/rust-base64/issues/213
 use base64::{engine, Engine as _};
