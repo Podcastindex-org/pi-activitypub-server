@@ -226,6 +226,69 @@ pub fn create_database(filepath: &String) -> Result<bool, Box<dyn Error>> {
         }
     }
 
+    //Create the replies table
+    match conn.execute(
+        "CREATE TABLE IF NOT EXISTS replies (
+             pcid integer,
+             statusid text,
+             objectid text,
+             objecttype text,
+             attributedto text,
+             content text,
+             sensitive integer,
+             published text,
+             received integer
+         )",
+        [],
+    ) {
+        Ok(_) => {
+            println!("Replies table is ready.");
+        }
+        Err(e) => {
+            eprintln!("{}", e);
+            return Err(Box::new(HydraError(format!("Failed to create database replies table: [{}].", filepath).into())));
+        }
+    }
+
+    match conn.execute(
+        "CREATE INDEX IF NOT EXISTS pcid_idx ON replies (pcid)",
+        [],
+    ) {
+        Ok(_) => {
+            println!("Replies index created.");
+        }
+        Err(e) => {
+            eprintln!("{}", e);
+            return Err(Box::new(HydraError(format!("Failed to create database replies index: [{}].", filepath).into())));
+        }
+    }
+
+    match conn.execute(
+        "CREATE INDEX IF NOT EXISTS statusid_idx ON replies (statusid)",
+        [],
+    ) {
+        Ok(_) => {
+            println!("Replies index created.");
+        }
+        Err(e) => {
+            eprintln!("{}", e);
+            return Err(Box::new(HydraError(format!("Failed to create database replies index: [{}].", filepath).into())));
+        }
+    }
+
+    match conn.execute(
+        "CREATE INDEX IF NOT EXISTS received_idx ON replies (received)",
+        [],
+    ) {
+        Ok(_) => {
+            println!("Replies index created.");
+        }
+        Err(e) => {
+            eprintln!("{}", e);
+            return Err(Box::new(HydraError(format!("Failed to create database replies index: [{}].", filepath).into())));
+        }
+    }
+
     Ok(true)
 }
 
