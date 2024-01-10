@@ -1082,151 +1082,147 @@ pub async fn inbox(ctx: Context) -> Response {
     }
     let podcast_guid = guid.clone();
 
-    //##: POST REQUEST
-    if http_action.to_lowercase() == "post" {
-        //let following_actor;
-        let (_parts, body) = ctx.req.into_parts();
-        let body_bytes = hyper::body::to_bytes(body).await.unwrap();
-        let body = std::str::from_utf8(&body_bytes).unwrap();
+    let (_parts, body) = ctx.req.into_parts();
+    let body_bytes = hyper::body::to_bytes(body).await.unwrap();
+    let body = std::str::from_utf8(&body_bytes).unwrap();
 
-        let inbox_request = serde_json::from_str::<InboxRequestWithObject>(body);
-        match inbox_request {
-            Ok(incoming_data) => {
-                //TODO: This should all be in separate functions
-                if incoming_data.r#type.to_lowercase() == "delete" {
-                    //TODO: Ignoring this for now
-                    println!("--Delete request");
+    let inbox_request = serde_json::from_str::<InboxRequestWithObject>(body);
+    match inbox_request {
+        Ok(incoming_data) => {
+            //TODO: This should all be in separate functions
+            if incoming_data.r#type.to_lowercase() == "delete" {
+                //TODO: Ignoring this for now
+                println!("--Delete request");
 
-                } else if incoming_data.r#type.to_lowercase() == "follow" {
-                    println!("--Follow request");
-                    let client = reqwest::Client::new();
-                    let response = client
-                        .get(&incoming_data.actor.clone().unwrap())
-                        .header(reqwest::header::USER_AGENT, "Podcast Index AP/v0.1.2a")
-                        .header(reqwest::header::ACCEPT, "application/activity+json")
-                        .send()
-                        .await;
-                    match response {
-                        Ok(response) => {
-                            match response.text().await {
-                                Ok(response_text) => {
-                                    let actor_data = serde_json::from_str::<Actor>(response_text.as_str()).unwrap();
-                                    //println!("{:#?}", actor_data);
+            } else if incoming_data.r#type.to_lowercase() == "follow" {
+                println!("--Follow request");
+                let client = reqwest::Client::new();
+                let response = client
+                    .get(&incoming_data.actor.clone().unwrap())
+                    .header(reqwest::header::USER_AGENT, "Podcast Index AP/v0.1.2a")
+                    .header(reqwest::header::ACCEPT, "application/activity+json")
+                    .send()
+                    .await;
+                match response {
+                    Ok(response) => {
+                        match response.text().await {
+                            Ok(response_text) => {
+                                let actor_data = serde_json::from_str::<Actor>(response_text.as_str()).unwrap();
+                                //println!("{:#?}", actor_data);
 
-                                    //Construct a response
-                                    println!("  Building follow accept json.");
-                                    let accept_data;
-                                    match ap_build_follow_accept(incoming_data, podcast_guid.parse::<u64>().unwrap()) {
-                                        Ok(data) => {
-                                            accept_data = data;
-                                        }
-                                        Err(e) => {
-                                            eprintln!("Build follow accept error: [{:#?}].\n", e);
-                                            return hyper::Response::builder()
-                                                .status(StatusCode::from_u16(500).unwrap())
-                                                .body(format!("Accept build error.").into())
-                                                .unwrap();
-                                        }
+                                //Construct a response
+                                println!("  Building follow accept json.");
+                                let accept_data;
+                                match ap_build_follow_accept(incoming_data, podcast_guid.parse::<u64>().unwrap()) {
+                                    Ok(data) => {
+                                        accept_data = data;
                                     }
-                                    let _accept_json;
-                                    match serde_json::to_string_pretty(&accept_data) {
-                                        Ok(json_result) => {
-                                            _accept_json = json_result;
-                                        }
-                                        Err(e) => {
-                                            eprintln!("Response prep error: [{:#?}].\n", e);
-                                            return hyper::Response::builder()
-                                                .status(StatusCode::from_u16(500).unwrap())
-                                                .body(format!("Accept encode error.").into())
-                                                .unwrap();
-                                        }
+                                    Err(e) => {
+                                        eprintln!("Build follow accept error: [{:#?}].\n", e);
+                                        return hyper::Response::builder()
+                                            .status(StatusCode::from_u16(500).unwrap())
+                                            .body(format!("Accept build error.").into())
+                                            .unwrap();
                                     }
+                                }
+                                let _accept_json;
+                                match serde_json::to_string_pretty(&accept_data) {
+                                    Ok(json_result) => {
+                                        _accept_json = json_result;
+                                    }
+                                    Err(e) => {
+                                        eprintln!("Response prep error: [{:#?}].\n", e);
+                                        return hyper::Response::builder()
+                                            .status(StatusCode::from_u16(500).unwrap())
+                                            .body(format!("Accept encode error.").into())
+                                            .unwrap();
+                                    }
+                                }
 
-                                    //##: Send the accept request to the follower inbox url
-                                    println!("  Send the follow accept request.");
-                                    match ap_send_follow_accept(
-                                        podcast_guid.parse::<u64>().unwrap(),
-                                        accept_data,
-                                        actor_data.inbox.clone()
-                                    ).await {
-                                        Ok(_) => {
-                                            let instance_fqdn = get_host_from_url(actor_data.inbox.clone());
-                                            match dbif::add_follower_to_db(&AP_DATABASE_FILE.to_string(), FollowerRecord {
-                                                pcid: podcast_guid.parse::<u64>().unwrap(),
-                                                actor: actor_data.id.clone(),
-                                                instance: instance_fqdn,
-                                                inbox: actor_data.inbox,
-                                                shared_inbox: actor_data.endpoints.sharedInbox,
-                                                status: "active".to_string(),
-                                            }) {
-                                                Ok(_) => {
-                                                    println!("Saved follow: [{}|{}]", podcast_guid, actor_data.id);
-                                                }
-                                                Err(e) => {
-                                                    eprintln!("Unable to save follow state: [{}].\n", e);
-                                                    return hyper::Response::builder()
-                                                        .status(StatusCode::from_u16(400).unwrap())
-                                                        .body(format!("Unable to save follow state.").into())
-                                                        .unwrap();
-                                                }
+                                //##: Send the accept request to the follower inbox url
+                                println!("  Send the follow accept request.");
+                                match ap_send_follow_accept(
+                                    podcast_guid.parse::<u64>().unwrap(),
+                                    accept_data,
+                                    actor_data.inbox.clone()
+                                ).await {
+                                    Ok(_) => {
+                                        let instance_fqdn = get_host_from_url(actor_data.inbox.clone());
+                                        match dbif::add_follower_to_db(&AP_DATABASE_FILE.to_string(), FollowerRecord {
+                                            pcid: podcast_guid.parse::<u64>().unwrap(),
+                                            actor: actor_data.id.clone(),
+                                            instance: instance_fqdn,
+                                            inbox: actor_data.inbox,
+                                            shared_inbox: actor_data.endpoints.sharedInbox,
+                                            status: "active".to_string(),
+                                        }) {
+                                            Ok(_) => {
+                                                println!("Saved follow: [{}|{}]", podcast_guid, actor_data.id);
+                                            }
+                                            Err(e) => {
+                                                eprintln!("Unable to save follow state: [{}].\n", e);
+                                                return hyper::Response::builder()
+                                                    .status(StatusCode::from_u16(400).unwrap())
+                                                    .body(format!("Unable to save follow state.").into())
+                                                    .unwrap();
                                             }
                                         }
-                                        Err(e) => {
-                                            eprintln!("Acknowledging failed: [{}].\n", e);
-                                            return hyper::Response::builder()
-                                                .status(StatusCode::from_u16(400).unwrap())
-                                                .body(format!("Acknowledging failed.").into())
-                                                .unwrap();
-                                        }
-                                    };
+                                    }
+                                    Err(e) => {
+                                        eprintln!("Acknowledging failed: [{}].\n", e);
+                                        return hyper::Response::builder()
+                                            .status(StatusCode::from_u16(400).unwrap())
+                                            .body(format!("Acknowledging failed.").into())
+                                            .unwrap();
+                                    }
+                                };
 
-                                }
-                                Err(e) => {
-                                    eprintln!("Bad actor: [{}].\n", e);
-                                    return hyper::Response::builder()
-                                        .status(StatusCode::from_u16(400).unwrap())
-                                        .body(format!("Bad actor.").into())
-                                        .unwrap();
-                                }
+                            }
+                            Err(e) => {
+                                eprintln!("Bad actor: [{}].\n", e);
+                                return hyper::Response::builder()
+                                    .status(StatusCode::from_u16(400).unwrap())
+                                    .body(format!("Bad actor.").into())
+                                    .unwrap();
                             }
                         }
-                        Err(e) => {
-                            eprintln!("Bad actor: [{}].\n", e);
-                            return hyper::Response::builder()
-                                .status(StatusCode::from_u16(400).unwrap())
-                                .body(format!("Bad actor.").into())
-                                .unwrap();
-                        }
                     }
-
-                } else if incoming_data.r#type.to_lowercase() == "undo" {
-                    //##: Un-follow
-                    println!("--Unfollow request");
-                    if incoming_data.object.r#type.is_some()
-                        && incoming_data.object.r#type.as_ref().unwrap().to_lowercase() == "follow"
-                    {
-                        let _ = dbif::remove_follower_from_db(&AP_DATABASE_FILE.to_string(), FollowerRecord {
-                            pcid: podcast_guid.parse::<u64>().unwrap(),
-                            actor: incoming_data.actor.unwrap(),
-                            instance: "".to_string(),
-                            inbox: "".to_string(),
-                            shared_inbox: "".to_string(),
-                            status: "".to_string(),
-                        });
+                    Err(e) => {
+                        eprintln!("Bad actor: [{}].\n", e);
+                        return hyper::Response::builder()
+                            .status(StatusCode::from_u16(400).unwrap())
+                            .body(format!("Bad actor.").into())
+                            .unwrap();
                     }
-                } else {
-                    eprintln!("--Unhandled request type");
-                    eprintln!("  Incoming request: {:#?}", incoming_data);
-                    eprintln!("  BODY: {}", body);
                 }
+
+            } else if incoming_data.r#type.to_lowercase() == "undo" {
+                //##: Un-follow
+                println!("--Unfollow request");
+                if incoming_data.object.r#type.is_some()
+                    && incoming_data.object.r#type.as_ref().unwrap().to_lowercase() == "follow"
+                {
+                    let _ = dbif::remove_follower_from_db(&AP_DATABASE_FILE.to_string(), FollowerRecord {
+                        pcid: podcast_guid.parse::<u64>().unwrap(),
+                        actor: incoming_data.actor.unwrap(),
+                        instance: "".to_string(),
+                        inbox: "".to_string(),
+                        shared_inbox: "".to_string(),
+                        status: "".to_string(),
+                    });
+                }
+            } else {
+                eprintln!("--Unhandled request type");
+                eprintln!("  Incoming request: {:#?}", incoming_data);
+                eprintln!("  BODY: {}", body);
             }
-            Err(e) => {
-                eprintln!("Could not parse incoming request: [{}].\n", e);
-                return hyper::Response::builder()
-                    .status(StatusCode::from_u16(400).unwrap())
-                    .body(format!("Invalid request format.").into())
-                    .unwrap();
-            }
+        }
+        Err(e) => {
+            eprintln!("Could not parse incoming request: [{}].\n", e);
+            return hyper::Response::builder()
+                .status(StatusCode::from_u16(400).unwrap())
+                .body(format!("Invalid request format.").into())
+                .unwrap();
         }
     }
 
