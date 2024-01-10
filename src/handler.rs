@@ -1211,10 +1211,15 @@ pub async fn inbox(ctx: Context) -> Response {
                         status: "".to_string(),
                     });
                 }
+
+            } else if incoming_data.r#type.to_lowercase() == "create" {
+                //##: Create
+                println!("--Create request: {:#?}", incoming_data);
+                println!("  BODY: {}", body);
+
             } else {
-                eprintln!("--Unhandled request type");
-                eprintln!("  Incoming request: {:#?}", incoming_data);
-                eprintln!("  BODY: {}", body);
+                println!("--Unhandled request: {:#?}", incoming_data);
+                println!("  BODY: {}", body);
             }
         }
         Err(e) => {
