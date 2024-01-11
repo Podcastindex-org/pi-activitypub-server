@@ -59,6 +59,18 @@ pub struct FollowerRecord {
     pub status: String,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ReplyRecord {
+    pub pcid: u64,
+    pub statusid: String,
+    pub objectid: String,
+    pub objecttype: String,
+    pub attributedto: String,
+    pub content: String,
+    pub sensitive: u64,
+    pub published: String,
+    pub received: u64
+}
 
 #[derive(Debug)]
 struct HydraError(String);
@@ -515,6 +527,116 @@ pub fn get_followers_from_db(filepath: &String, pcid: u64) -> Result<Vec<Followe
     }
 
     return Ok(followers.clone());
+
+
+    //Err(Box::new(HydraError(format!("Failed to get followers for: [{}].", pcid).into())))
+}
+
+
+//GetSet a reply in the database
+pub fn add_reply_to_db(filepath: &String, reply: ReplyRecord) -> Result<bool, Box<dyn Error>> {
+    let conn = connect_to_database(false, filepath)?;
+
+    match conn.execute("INSERT INTO replies (\
+                                         pcid, \
+                                         statusid, \
+                                         objectid, \
+                                         objecttype, \
+                                         attributedto, \
+                                         content, \
+                                         sensitive, \
+                                         published, \
+                                         received \
+                                    ) \
+                        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                       params![
+                           reply.pcid,
+                           reply.statusid,
+                           reply.objectid,
+                           reply.objecttype,
+                           reply.attributedto,
+                           reply.content,
+                           reply.sensitive,
+                           reply.published,
+                           reply.received
+                       ],
+    ) {
+        Ok(_) => {
+            Ok(true)
+        }
+        Err(e) => {
+            eprintln!("{}", e);
+            return Err(Box::new(HydraError(format!("Failed to add reply: [{}].", reply.objectid).into())));
+        }
+    }
+}
+//TODO
+pub fn remove_reply_from_db(filepath: &String, reply: ReplyRecord) -> Result<bool, Box<dyn Error>> {
+    let conn = connect_to_database(false, filepath)?;
+
+    match conn.execute("DELETE FROM replies WHERE objectid=?",
+                       params![
+                           reply.objectid,
+                       ],
+    ) {
+        Ok(_) => {
+            Ok(true)
+        }
+        Err(e) => {
+            eprintln!("{}", e);
+            return Err(Box::new(HydraError(format!("Failed to remove reply: [{}].", reply.objectid).into())));
+        }
+    }
+}
+
+pub fn get_replies_from_db(filepath: &String, pcid: u64, statusid: String) -> Result<Vec<ReplyRecord>, Box<dyn Error>> {
+    let conn = connect_to_database(false, filepath)?;
+    let mut replies: Vec<ReplyRecord> = Vec::new();
+    let max = 1000; //TODO: debug - hard limit for now
+
+    //Prepare and execute the query
+    let mut stmt = conn.prepare("SELECT \
+                                     pcid, \
+                                     statusid, \
+                                     objectid, \
+                                     objecttype, \
+                                     attributedto, \
+                                     content, \
+                                     sensitive, \
+                                     published, \
+                                     received \
+                                 FROM replies \
+                                 WHERE pcid = :pcid \
+                                   AND statusid = :statusid \
+                                 ORDER BY received DESC \
+                                 LIMIT :max")?;
+    let rows = stmt.query_map(
+        &[
+            (":max", max.to_string().as_str()),
+            (":pcid", pcid.to_string().as_str()),
+            (":statusid", statusid.as_str())
+        ],
+        |row| {
+            Ok(ReplyRecord {
+                pcid: row.get(0)?,
+                statusid: row.get(1)?,
+                objectid: row.get(2)?,
+                objecttype: row.get(3)?,
+                attributedto: row.get(4)?,
+                content: row.get(5)?,
+                sensitive: row.get(6)?,
+                published: row.get(7)?,
+                received: row.get(8)?,
+            })
+        }).unwrap();
+
+    //Parse the results
+    for row in rows {
+        let reply: ReplyRecord = row.unwrap();
+        replies.push(reply);
+    }
+
+    return Ok(replies.clone());
 
 
     //Err(Box::new(HydraError(format!("Failed to get followers for: [{}].", pcid).into())))
