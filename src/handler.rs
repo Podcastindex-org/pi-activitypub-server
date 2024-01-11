@@ -15,7 +15,7 @@ use chrono::{TimeZone, Utc};
 use rsa::{RsaPrivateKey, RsaPublicKey};
 //use rsa::pkcs1v15::{SigningKey, VerifyingKey};
 //use rsa::signature::{Keypair, RandomizedSigner, SignatureEncoding, Verifier, Signer};
-use dbif::{ActorRecord, FollowerRecord};
+use dbif::{ActorRecord, FollowerRecord, ReplyRecord};
 //use base64::{Engine as _, engine::{general_purpose}};
 //use rand::rngs::ThreadRng;
 //use sha256::digest;
@@ -1224,6 +1224,7 @@ pub async fn inbox(ctx: Context) -> Response {
         }
         Err(e) => {
             eprintln!("Could not parse incoming request: [{}].\n", e);
+            eprintln!("  BODY: {}", body);
             return hyper::Response::builder()
                 .status(StatusCode::from_u16(400).unwrap())
                 .body(format!("Invalid request format.").into())
