@@ -65,7 +65,7 @@ pub struct Icon {
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TagObject {
-    id: String,
+    id: Option<String>,
     r#type: String,
     name: Option<String>,
     href: Option<String>,
