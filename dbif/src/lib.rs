@@ -686,7 +686,8 @@ pub fn get_a_reply_by_conversation(filepath: &String, conversation: String) -> R
                                      content, \
                                      sensitive, \
                                      published, \
-                                     received \
+                                     received,\
+                                     conversation \
                                  FROM replies \
                                  WHERE conversation = :conversation \
                                  ORDER BY received DESC")?;
