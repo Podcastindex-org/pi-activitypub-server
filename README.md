@@ -31,3 +31,7 @@ The bridge uses a SQLite file for it's DB and will auto-create the file if one i
 ## Contributing
 
 Outside contributions are very welcome.
+
+## Version history
+
+v0.0.5 - Initial stages of reply handling.
