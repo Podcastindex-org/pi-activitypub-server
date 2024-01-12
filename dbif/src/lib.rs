@@ -576,7 +576,7 @@ pub fn add_reply_to_db(filepath: &String, reply: ReplyRecord) -> Result<bool, Bo
                                          received,\
                                          conversation \
                                     ) \
-                        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
                        params![
                            reply.pcid,
                            reply.statusid,
