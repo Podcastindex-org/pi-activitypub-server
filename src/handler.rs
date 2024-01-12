@@ -1092,7 +1092,8 @@ pub async fn inbox(ctx: Context) -> Response {
             //TODO: This should all be in separate functions
             if incoming_data.r#type.to_lowercase() == "delete" {
                 //TODO: Ignoring this for now
-                println!("--Delete request");
+                println!("--Delete request: {:#?}", incoming_data);
+                println!("  BODY: {}", body);
 
             } else if incoming_data.r#type.to_lowercase() == "follow" {
                 println!("--Follow request");
