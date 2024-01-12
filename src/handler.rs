@@ -1225,22 +1225,23 @@ pub async fn inbox(ctx: Context) -> Response {
                     let in_reply_to_url = incoming_data.object.inReplyTo.unwrap();
                     let parent_pcid = get_id_from_url(in_reply_to_url.clone());
                     let parent_episode_guid = get_statusid_from_url(in_reply_to_url.clone());
-                    let received_time = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time mismatch.").as_secs();
 
-                    let _ =dbif::add_reply_to_db(&AP_DATABASE_FILE.to_string(), ReplyRecord {
-                        pcid: parent_pcid.parse::<u64>().unwrap(),
-                        statusid: parent_episode_guid,
-                        objectid: incoming_data.object.id,
-                        objecttype: incoming_data.object.r#type.unwrap_or("".to_string()),
-                        attributedto: incoming_data.object.attributedTo.unwrap_or("".to_string()),
-                        content: incoming_data.object.content.unwrap(),
-                        sensitive: 0,
-                        published: incoming_data.object.published.unwrap_or(received_time.to_string()),
-                        received: received_time,
-                    });
+                    if parent_pcid != "" && parent_episode_guid != "" {
+                            let received_time = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time mismatch.").as_secs();
+
+                            let _ =dbif::add_reply_to_db(&AP_DATABASE_FILE.to_string(), ReplyRecord {
+                                pcid: parent_pcid.parse::<u64>().unwrap(),
+                                statusid: parent_episode_guid,
+                                objectid: incoming_data.object.id,
+                                objecttype: incoming_data.object.r#type.unwrap_or("".to_string()),
+                                attributedto: incoming_data.object.attributedTo.unwrap_or("".to_string()),
+                                content: incoming_data.object.content.unwrap(),
+                                sensitive: 0,
+                                published: incoming_data.object.published.unwrap_or(received_time.to_string()),
+                                received: received_time,
+                            });
+                        }
                 }
-
-
 
             } else {
                 println!("--Unhandled request: {:#?}", incoming_data);
