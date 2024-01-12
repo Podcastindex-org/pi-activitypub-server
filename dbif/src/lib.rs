@@ -328,6 +328,19 @@ pub fn create_database(filepath: &String) -> Result<bool, Box<dyn Error>> {
         }
     }
 
+    match conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS objectid_idx ON replies (objectid)",
+        [],
+    ) {
+        Ok(_) => {
+            println!("Replies index created.");
+        }
+        Err(e) => {
+            eprintln!("{}", e);
+            return Err(Box::new(HydraError(format!("Failed to create database replies index: [{}].", filepath).into())));
+        }
+    }
+
     Ok(true)
 }
 
