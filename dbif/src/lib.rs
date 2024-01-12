@@ -303,6 +303,19 @@ pub fn create_database(filepath: &String) -> Result<bool, Box<dyn Error>> {
     }
 
     match conn.execute(
+        "ALTER TABLE replies ADD conversation text",
+        [],
+    ) {
+        Ok(_) => {
+            println!("Conversation column created in replies table.");
+        }
+        Err(e) => {
+            eprintln!("{}", e);
+            return Err(Box::new(HydraError(format!("Failed to add column to replies table: [{}].", filepath).into())));
+        }
+    }
+
+    match conn.execute(
         "CREATE INDEX IF NOT EXISTS conversation_idx ON replies (conversation)",
         [],
     ) {
