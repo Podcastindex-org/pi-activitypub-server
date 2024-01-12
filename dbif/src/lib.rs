@@ -250,7 +250,8 @@ pub fn create_database(filepath: &String) -> Result<bool, Box<dyn Error>> {
              content text,
              sensitive integer,
              published text,
-             received integer
+             received integer,
+             conversation text
          )",
         [],
     ) {
@@ -299,19 +300,6 @@ pub fn create_database(filepath: &String) -> Result<bool, Box<dyn Error>> {
         Err(e) => {
             eprintln!("{}", e);
             return Err(Box::new(HydraError(format!("Failed to create database replies index: [{}].", filepath).into())));
-        }
-    }
-
-    match conn.execute(
-        "ALTER TABLE replies ADD conversation text",
-        [],
-    ) {
-        Ok(_) => {
-            println!("Conversation column created in replies table.");
-        }
-        Err(e) => {
-            eprintln!("{}", e);
-            //return Err(Box::new(HydraError(format!("Failed to add column to replies table: [{}].", filepath).into())));
         }
     }
 
