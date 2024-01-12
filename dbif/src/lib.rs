@@ -311,7 +311,7 @@ pub fn create_database(filepath: &String) -> Result<bool, Box<dyn Error>> {
         }
         Err(e) => {
             eprintln!("{}", e);
-            return Err(Box::new(HydraError(format!("Failed to add column to replies table: [{}].", filepath).into())));
+            //return Err(Box::new(HydraError(format!("Failed to add column to replies table: [{}].", filepath).into())));
         }
     }
 
