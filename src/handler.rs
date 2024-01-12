@@ -1239,6 +1239,7 @@ pub async fn inbox(ctx: Context) -> Response {
                                 sensitive: 0,
                                 published: incoming_data.object.published.unwrap_or(received_time.to_string()),
                                 received: received_time,
+                                conversation: incoming_data.object.conversation.unwrap_or("".to_string()),
                             });
                         }
                 }

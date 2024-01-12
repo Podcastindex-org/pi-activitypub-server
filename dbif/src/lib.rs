@@ -69,7 +69,8 @@ pub struct ReplyRecord {
     pub content: String,
     pub sensitive: u64,
     pub published: String,
-    pub received: u64
+    pub received: u64,
+    pub conversation: String,
 }
 
 #[derive(Debug)]
@@ -290,6 +291,19 @@ pub fn create_database(filepath: &String) -> Result<bool, Box<dyn Error>> {
 
     match conn.execute(
         "CREATE INDEX IF NOT EXISTS received_idx ON replies (received)",
+        [],
+    ) {
+        Ok(_) => {
+            println!("Replies index created.");
+        }
+        Err(e) => {
+            eprintln!("{}", e);
+            return Err(Box::new(HydraError(format!("Failed to create database replies index: [{}].", filepath).into())));
+        }
+    }
+
+    match conn.execute(
+        "CREATE INDEX IF NOT EXISTS conversation_idx ON replies (conversation)",
         [],
     ) {
         Ok(_) => {
@@ -546,7 +560,8 @@ pub fn add_reply_to_db(filepath: &String, reply: ReplyRecord) -> Result<bool, Bo
                                          content, \
                                          sensitive, \
                                          published, \
-                                         received \
+                                         received,\
+                                         conversation \
                                     ) \
                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
                        params![
@@ -558,7 +573,8 @@ pub fn add_reply_to_db(filepath: &String, reply: ReplyRecord) -> Result<bool, Bo
                            reply.content,
                            reply.sensitive,
                            reply.published,
-                           reply.received
+                           reply.received,
+                           reply.conversation
                        ],
     ) {
         Ok(_) => {
@@ -589,7 +605,7 @@ pub fn remove_reply_from_db(filepath: &String, reply: ReplyRecord) -> Result<boo
     }
 }
 
-pub fn get_replies_from_db(filepath: &String, pcid: u64, statusid: String) -> Result<Vec<ReplyRecord>, Box<dyn Error>> {
+pub fn get_replies_from_db_by_episode(filepath: &String, pcid: u64, statusid: String) -> Result<Vec<ReplyRecord>, Box<dyn Error>> {
     let conn = connect_to_database(false, filepath)?;
     let mut replies: Vec<ReplyRecord> = Vec::new();
     let max = 1000; //TODO: debug - hard limit for now
@@ -627,6 +643,7 @@ pub fn get_replies_from_db(filepath: &String, pcid: u64, statusid: String) -> Re
                 sensitive: row.get(6)?,
                 published: row.get(7)?,
                 received: row.get(8)?,
+                conversation: row.get(9)?,
             })
         }).unwrap();
 
