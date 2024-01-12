@@ -671,3 +671,52 @@ pub fn get_replies_from_db_by_episode(filepath: &String, pcid: u64, statusid: St
 
     //Err(Box::new(HydraError(format!("Failed to get followers for: [{}].", pcid).into())))
 }
+
+pub fn get_a_reply_by_conversation(filepath: &String, conversation: String) -> Result<Vec<ReplyRecord>, Box<dyn Error>> {
+    let conn = connect_to_database(false, filepath)?;
+    let mut replies: Vec<ReplyRecord> = Vec::new();
+
+    //Prepare and execute the query
+    let mut stmt = conn.prepare("SELECT \
+                                     pcid, \
+                                     statusid, \
+                                     objectid, \
+                                     objecttype, \
+                                     attributedto, \
+                                     content, \
+                                     sensitive, \
+                                     published, \
+                                     received \
+                                 FROM replies \
+                                 WHERE conversation = :conversation \
+                                 ORDER BY received DESC")?;
+    let rows = stmt.query_map(
+        &[
+            (":conversation", conversation.as_str())
+        ],
+        |row| {
+            Ok(ReplyRecord {
+                pcid: row.get(0)?,
+                statusid: row.get(1)?,
+                objectid: row.get(2)?,
+                objecttype: row.get(3)?,
+                attributedto: row.get(4)?,
+                content: row.get(5)?,
+                sensitive: row.get(6)?,
+                published: row.get(7)?,
+                received: row.get(8)?,
+                conversation: row.get(9)?,
+            })
+        }).unwrap();
+
+    //Parse the results
+    for row in rows {
+        let reply: ReplyRecord = row.unwrap();
+        replies.push(reply);
+    }
+
+    return Ok(replies.clone());
+
+
+    //Err(Box::new(HydraError(format!("Failed to get followers for: [{}].", pcid).into())))
+}
