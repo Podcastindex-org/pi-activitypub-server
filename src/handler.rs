@@ -159,21 +159,35 @@ pub struct InboxRequestWithObject {
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct InboxRequestObject {
-    id: String, //"https://podcastindex.social/users/dave/statuses/111689975521776545"
-    r#type: Option<String>, //"Note"
+    id: String,
+    //"https://podcastindex.social/users/dave/statuses/111689975521776545"
+    r#type: Option<String>,
+    //"Note"
     actor: Option<String>,
-    summary: Option<String>, //null
-    inReplyTo: Option<String>, //"https://podcastindex.social/users/dave/statuses/111683789181428177"
-    published: Option<String>, //"2024-01-03T03:49:36Z"
-    url: Option<String>, //"https://podcastindex.social/@dave/111689975521776545"
-    attributedTo: Option<String>, //"https://podcastindex.social/users/dave"
-    to: Option<Vec<String>>, //["https://www.w3.org/ns/activitystreams#Public" ]
-    cc: Option<Vec<String>>, //["https://podcastindex.social/users/dave/followers", "https://ap.podc...]"
-    sensitive: Option<bool>, //false
-    atomUri: Option<String>, //"https://podcastindex.social/users/dave/statuses/111689975521776545"
-    inReplyToAtomUri: Option<String>, //"https://podcastindex.social/users/dave/statuses/111683789181428177"
-    conversation: Option<String>, //"tag:ap.podcastindex.org,2023-12-30T05:02:50+00:00:objectId=podserve:f69b5c6c-6c16-43e5-a9d6-3f93a2756e48:objectType=Conversation",
-    content: Option<String>, //"\u003cp\u003e\u003cspan class=\"h-card\" translate=\"no\"\u003e\u003ca href=\"https://ap.podcastindex.org/podcasts?id=6594066\" class=\"u-url mention\"\u003e@\u003cspan\u003e6594066\u003c/span\u003e\u003c/a\u003e\u003c/span\u003e Another test. \u003ca href=\"https://podcastindex.social/tags/ignore\" class=\"mention hashtag\" rel=\"tag\"\u003e#\u003cspan\u003eignore\u003c/span\u003e\u003c/a\u003e\u003c/p\u003e",
+    summary: Option<String>,
+    //null
+    inReplyTo: Option<String>,
+    //"https://podcastindex.social/users/dave/statuses/111683789181428177"
+    published: Option<String>,
+    //"2024-01-03T03:49:36Z"
+    url: Option<String>,
+    //"https://podcastindex.social/@dave/111689975521776545"
+    attributedTo: Option<String>,
+    //"https://podcastindex.social/users/dave"
+    to: Option<Vec<String>>,
+    //["https://www.w3.org/ns/activitystreams#Public" ]
+    cc: Option<Vec<String>>,
+    //["https://podcastindex.social/users/dave/followers", "https://ap.podc...]"
+    sensitive: Option<bool>,
+    //false
+    atomUri: Option<String>,
+    //"https://podcastindex.social/users/dave/statuses/111689975521776545"
+    inReplyToAtomUri: Option<String>,
+    //"https://podcastindex.social/users/dave/statuses/111683789181428177"
+    conversation: Option<String>,
+    //"tag:ap.podcastindex.org,2023-12-30T05:02:50+00:00:objectId=podserve:f69b5c6c-6c16-43e5-a9d6-3f93a2756e48:objectType=Conversation",
+    content: Option<String>,
+    //"\u003cp\u003e\u003cspan class=\"h-card\" translate=\"no\"\u003e\u003ca href=\"https://ap.podcastindex.org/podcasts?id=6594066\" class=\"u-url mention\"\u003e@\u003cspan\u003e6594066\u003c/span\u003e\u003c/a\u003e\u003c/span\u003e Another test. \u003ca href=\"https://podcastindex.social/tags/ignore\" class=\"mention hashtag\" rel=\"tag\"\u003e#\u003cspan\u003eignore\u003c/span\u003e\u003c/a\u003e\u003c/p\u003e",
     attachment: Option<Vec<Attachment>>,
     tag: Option<Vec<TagObject>>,
     replies: Option<ReplyCollection>,
@@ -495,7 +509,7 @@ fn d_blank_inboxrequest() -> InboxRequestObject {
 
 fn de_optional_string_or_struct<'de, T, D>(deserializer: D) -> Result<T, D::Error>
     where
-        T: Deserialize<'de> + FromStr<Err = Void>,
+        T: Deserialize<'de> + FromStr<Err=Void>,
         D: Deserializer<'de>,
 {
     // This is a Visitor that forwards string types to T's `FromStr` impl and
@@ -507,7 +521,7 @@ fn de_optional_string_or_struct<'de, T, D>(deserializer: D) -> Result<T, D::Erro
 
     impl<'de, T> Visitor<'de> for StringOrStruct<T>
         where
-            T: Deserialize<'de> + FromStr<Err = Void>,
+            T: Deserialize<'de> + FromStr<Err=Void>,
     {
         type Value = T;
 
@@ -580,7 +594,7 @@ pub async fn webfinger(ctx: Context) -> Response {
     let api_response = api_get_podcast(
         &ctx.pi_auth.key,
         &ctx.pi_auth.secret,
-        &podcast_guid
+        &podcast_guid,
     ).await;
     match api_response {
         Ok(response_body) => {
@@ -689,11 +703,12 @@ pub async fn podcasts(ctx: Context) -> Response {
             guid = parts.split("@").next().unwrap().to_string();
         }
         None => {
-            println!("Invalid resource.\n");
-            return hyper::Response::builder()
-                .status(StatusCode::from_u16(400).unwrap())
-                .body(format!("No resource given.").into())
-                .unwrap();
+            guid = "0".to_string();
+            // println!("Invalid resource.\n");
+            // return hyper::Response::builder()
+            //     .status(StatusCode::from_u16(400).unwrap())
+            //     .body(format!("No resource given.").into())
+            //     .unwrap();
         }
     }
     let podcast_guid = guid.clone();
@@ -703,31 +718,52 @@ pub async fn podcasts(ctx: Context) -> Response {
     let api_response = api_get_podcast(
         &ctx.pi_auth.key,
         &ctx.pi_auth.secret,
-        &podcast_guid
+        &podcast_guid,
     ).await;
-    match api_response {
-        Ok(response_body) => {
-            //eprintln!("{:#?}", response_body);
-            match serde_json::from_str(response_body.as_str()) {
-                Ok(data) => {
-                    podcast_data = data;
-                    println!("{}", podcast_data.feed.image);
-                }
-                Err(e) => {
-                    println!("Response prep error: [{:#?}].\n", e);
-                    return hyper::Response::builder()
-                        .status(StatusCode::from_u16(501).unwrap())
-                        .body(format!("Response prep error.").into())
-                        .unwrap();
+    if podcast_guid != "0" {
+        match api_response {
+            Ok(response_body) => {
+                //eprintln!("{:#?}", response_body);
+                match serde_json::from_str(response_body.as_str()) {
+                    Ok(data) => {
+                        podcast_data = data;
+                        println!("{}", podcast_data.feed.image);
+                    }
+                    Err(e) => {
+                        println!("Response prep error: [{:#?}].\n", e);
+                        return hyper::Response::builder()
+                            .status(StatusCode::from_u16(501).unwrap())
+                            .body(format!("Response prep error.").into())
+                            .unwrap();
+                    }
                 }
             }
+            Err(e) => {
+                println!("Response prep error: [{:#?}].\n", e);
+                return hyper::Response::builder()
+                    .status(StatusCode::from_u16(501).unwrap())
+                    .body(format!("Response prep error.").into())
+                    .unwrap();
+            }
         }
-        Err(e) => {
-            println!("Response prep error: [{:#?}].\n", e);
-            return hyper::Response::builder()
-                .status(StatusCode::from_u16(501).unwrap())
-                .body(format!("Response prep error.").into())
-                .unwrap();
+    } else {    //##: Actor instance
+        podcast_data = PIPodcast {
+            status: "true".to_string(),
+            feed: PIFeed {
+                id: 0,
+                podcastGuid: "".to_string(),
+                medium: "".to_string(),
+                title: "Podcast Index ActivityPub Bridge".to_string(),
+                url: "".to_string(),
+                originalUrl: "".to_string(),
+                link: "".to_string(),
+                description: "Podcast Index ActivityPub Bridge".to_string(),
+                author: "Podcastindex.org".to_string(),
+                ownerName: "Podcastindex.org".to_string(),
+                image: "https://noagendaassets.com/enc/1684513486.722_pcifeedimage.png".to_string(),
+                artwork: "https://noagendaassets.com/enc/1684513486.722_pcifeedimage.png".to_string(),
+                episodeCount: 0,
+            },
         }
     }
 
@@ -822,7 +858,7 @@ pub async fn profiles(ctx: Context) -> Response {
     let api_response = api_get_podcast(
         &ctx.pi_auth.key,
         &ctx.pi_auth.secret,
-        &podcast_guid
+        &podcast_guid,
     ).await;
     match api_response {
         Ok(response_body) => {
@@ -933,7 +969,7 @@ pub async fn outbox(ctx: Context) -> Response {
     let api_response = api_get_episodes(
         &ctx.pi_auth.key,
         &ctx.pi_auth.secret,
-        &podcast_guid
+        &podcast_guid,
     ).await;
     match api_response {
         Ok(response_body) => {
@@ -1097,9 +1133,9 @@ pub async fn inbox(ctx: Context) -> Response {
         }
         None => {
             eprintln!("Invalid resource: [{}]: [{}] from: {:#?}",
-                     http_action,
-                     ctx.req.uri(),
-                     ctx.req.headers().get("user-agent")
+                      http_action,
+                      ctx.req.uri(),
+                      ctx.req.headers().get("user-agent")
             );
             return hyper::Response::builder()
                 .status(StatusCode::from_u16(400).unwrap())
@@ -1121,7 +1157,6 @@ pub async fn inbox(ctx: Context) -> Response {
                 //TODO: Ignoring this for now
                 println!("--Delete request: {:#?}", incoming_data);
                 println!("  BODY: {}", body);
-
             } else if incoming_data.r#type.to_lowercase() == "follow" {
                 println!("--Follow request");
                 let client = reqwest::Client::new();
@@ -1172,7 +1207,7 @@ pub async fn inbox(ctx: Context) -> Response {
                                 match ap_send_follow_accept(
                                     podcast_guid.parse::<u64>().unwrap(),
                                     accept_data,
-                                    actor_data.inbox.clone()
+                                    actor_data.inbox.clone(),
                                 ).await {
                                     Ok(_) => {
                                         let instance_fqdn = get_host_from_url(actor_data.inbox.clone());
@@ -1213,7 +1248,6 @@ pub async fn inbox(ctx: Context) -> Response {
                                             .unwrap();
                                     }
                                 };
-
                             }
                             Err(e) => {
                                 eprintln!("Bad actor: [{}].\n", e);
@@ -1232,7 +1266,6 @@ pub async fn inbox(ctx: Context) -> Response {
                             .unwrap();
                     }
                 }
-
             } else if incoming_data.r#type.to_lowercase() == "undo" {
                 //##: Un-follow
                 println!("--Unfollow request");
@@ -1248,7 +1281,6 @@ pub async fn inbox(ctx: Context) -> Response {
                         status: "".to_string(),
                     });
                 }
-
             } else if incoming_data.r#type.to_lowercase() == "create" {
                 //##: Create
                 println!("--Create request: {:#?}", incoming_data);
@@ -1266,7 +1298,7 @@ pub async fn inbox(ctx: Context) -> Response {
 
                     if parent_pcid != "" && parent_episode_guid != ""
                     {
-                        let _ =dbif::add_reply_to_db(&AP_DATABASE_FILE.to_string(), ReplyRecord {
+                        let _ = dbif::add_reply_to_db(&AP_DATABASE_FILE.to_string(), ReplyRecord {
                             pcid: parent_pcid.parse::<u64>().unwrap(),
                             statusid: parent_episode_guid,
                             objectid: incoming_data.object.id,
@@ -1281,11 +1313,11 @@ pub async fn inbox(ctx: Context) -> Response {
                     } else {
                         let replies = dbif::get_a_reply_by_conversation(
                             &AP_DATABASE_FILE.to_string(),
-                            reply_conversation.clone()
+                            reply_conversation.clone(),
                         );
 
                         for reply in replies.unwrap() {
-                            let _ =dbif::add_reply_to_db(&AP_DATABASE_FILE.to_string(), ReplyRecord {
+                            let _ = dbif::add_reply_to_db(&AP_DATABASE_FILE.to_string(), ReplyRecord {
                                 pcid: reply.pcid,
                                 statusid: reply.statusid,
                                 objectid: incoming_data.object.id,
@@ -1301,7 +1333,6 @@ pub async fn inbox(ctx: Context) -> Response {
                         }
                     }
                 }
-
             } else {
                 println!("--Unhandled request: {:#?}", incoming_data);
                 println!("  BODY: {}", body);
@@ -1540,7 +1571,7 @@ pub async fn episodes(ctx: Context) -> Response {
             &ctx.pi_auth.key,
             &ctx.pi_auth.secret,
             &podcast_guid,
-            &episode_guid
+            &episode_guid,
         ).await;
         match api_response {
             Ok(response_body) => {
@@ -1680,7 +1711,6 @@ pub async fn followers(ctx: Context) -> Response {
         .body(format!("").into())
         .unwrap();
 }
-
 
 
 //API calls --------------------------------------------------------------------------------------------------
@@ -2017,7 +2047,6 @@ fn ap_build_follow_accept(follow_request: InboxRequestWithObject, podcast_guid: 
 }
 
 fn ap_get_actor_keys(podcast_guid: u64) -> Result<ActorKeys, Box<dyn Error>> {
-
     println!("  Getting actor keys for: [{}]", podcast_guid);
 
     let actor_keys;
@@ -2084,7 +2113,6 @@ fn ap_get_actor_keys(podcast_guid: u64) -> Result<ActorKeys, Box<dyn Error>> {
 }
 
 pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequestAccept, inbox_url: String) -> Result<String, Box<dyn Error>> {
-
     println!("  AP Accepting Follow request from: {}", inbox_accept.object.actor);
 
     //##: Get actor keys for guid
@@ -2116,13 +2144,13 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
     println!("  POST BODY: {}", post_body);
 
     let key_id = format!("https://ap.podcastindex.org/podcasts?id={}#main-key", podcast_guid);
-    let http_signature_headers ;
+    let http_signature_headers;
     match http_signature::create_http_signature(
         http::Method::POST,
         &inbox_url,
         &post_body.clone(),
         &private_key,
-        &key_id
+        &key_id,
     ) {
         Ok(sig_headers) => {
             http_signature_headers = sig_headers;
@@ -2163,7 +2191,6 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
                 eprintln!("  Body: [{:#?}]", res_body);
                 return Err(Box::new(HydraError(format!("Accepting the follow request failed.").into())));
             }
-
         }
         Err(e) => {
             eprintln!("  Error: [{}]", e);
@@ -2173,7 +2200,6 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
 }
 
 pub fn ap_block_send_note(podcast_guid: u64, episode: &PIItem, inbox_url: String) -> Result<String, Box<dyn Error>> {
-
     println!("  AP Sending create episode note from actor: {}", podcast_guid);
 
     //##: Get actor keys for guid
@@ -2265,13 +2291,13 @@ pub fn ap_block_send_note(podcast_guid: u64, episode: &PIItem, inbox_url: String
 
     //##: Build the http signing headers
     let key_id = format!("https://ap.podcastindex.org/podcasts?id={}#main-key", podcast_guid);
-    let http_signature_headers ;
+    let http_signature_headers;
     match http_signature::create_http_signature(
         http::Method::POST,
         &inbox_url,
         &create_json.clone(),
         &private_key,
-        &key_id
+        &key_id,
     ) {
         Ok(sig_headers) => {
             http_signature_headers = sig_headers;
@@ -2314,8 +2340,8 @@ pub fn ap_block_send_note(podcast_guid: u64, episode: &PIItem, inbox_url: String
         }
     }
 }
-pub fn ap_block_send_live_note(podcast_guid: u64, episode: &PILiveItem, inbox_url: String) -> Result<String, Box<dyn Error>> {
 
+pub fn ap_block_send_live_note(podcast_guid: u64, episode: &PILiveItem, inbox_url: String) -> Result<String, Box<dyn Error>> {
     println!("  AP Sending create episode note from actor: {}", podcast_guid);
 
     //##: Get actor keys for guid
@@ -2409,13 +2435,13 @@ pub fn ap_block_send_live_note(podcast_guid: u64, episode: &PILiveItem, inbox_ur
 
     //##: Build the http signing headers
     let key_id = format!("https://ap.podcastindex.org/podcasts?id={}#main-key", podcast_guid);
-    let http_signature_headers ;
+    let http_signature_headers;
     match http_signature::create_http_signature(
         http::Method::POST,
         &inbox_url,
         &create_json.clone(),
         &private_key,
-        &key_id
+        &key_id,
     ) {
         Ok(sig_headers) => {
             http_signature_headers = sig_headers;
