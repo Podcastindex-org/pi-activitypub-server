@@ -134,7 +134,7 @@ pub struct Actor {
     #[serde(skip_serializing_if = "Option::is_none")]
     attachment: Option<Vec<Attachment>>,
     publicKey: PublicKey,
-    endpoints: Endpoints,
+    endpoints: Option<Endpoints>,
 }
 
 #[allow(non_snake_case)]
@@ -1149,12 +1149,21 @@ pub async fn inbox(ctx: Context) -> Response {
                                 ).await {
                                     Ok(_) => {
                                         let instance_fqdn = get_host_from_url(actor_data.inbox.clone());
+                                        let shared_inbox;
+                                        match actor_data.endpoints {
+                                            Some(endpoints) => {
+                                                shared_inbox = endpoints.sharedInbox.clone();
+                                            }
+                                            None => {
+                                                shared_inbox = actor_data.inbox.clone();
+                                            }
+                                        }
                                         match dbif::add_follower_to_db(&AP_DATABASE_FILE.to_string(), FollowerRecord {
                                             pcid: podcast_guid.parse::<u64>().unwrap(),
                                             actor: actor_data.id.clone(),
                                             instance: instance_fqdn,
                                             inbox: actor_data.inbox,
-                                            shared_inbox: actor_data.endpoints.sharedInbox,
+                                            shared_inbox: shared_inbox,
                                             status: "active".to_string(),
                                         }) {
                                             Ok(_) => {
@@ -1922,9 +1931,9 @@ fn ap_build_actor_object(podcast_data: PIPodcast, actor_keys: ActorKeys) -> Resu
             owner: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
             publicKeyPem: actor_keys.pem_public_key,
         },
-        endpoints: Endpoints {
+        endpoints: Some(Endpoints {
             sharedInbox: "https://ap.podcastindex.org/inbox?id=0".to_string(),
-        },
+        }),
         url: Some(format!("https://podcastindex.org/podcast/{}", podcast_guid).to_string()),
         manuallyApprovesFollowers: Some(false),
         indexable: Some(true),
