@@ -290,9 +290,14 @@ fn episode_tracker(api_key: String, api_secret: String) {
             }
         }
 
+        let actor_count = 0;
         for actor in actors {
             match dbif::get_followers_from_db(&AP_DATABASE_FILE.to_string(), actor.pcid) {
                 Ok(followers) => {
+                    if followers.len() > 0 {
+                        actor_count += 1;
+                    }
+
                     //##: Lookup API of podcast
                     println!("  Podcast - [{}]", actor.pcid);
                     match api_block_get_episodes(
@@ -325,7 +330,6 @@ fn episode_tracker(api_key: String, api_secret: String) {
                                                 }
                                             }
 
-
                                             let _ = dbif::update_actor_last_episode_guid_in_db(
                                                 &AP_DATABASE_FILE.to_string(),
                                                 actor.pcid,
@@ -355,6 +359,8 @@ fn episode_tracker(api_key: String, api_secret: String) {
 
             thread::sleep(Duration::from_millis(1000));
         }
+
+        println!("TRACKER: [{}] podcasts being followed.", actor_count);
     }
 }
 
