@@ -94,7 +94,7 @@ pub struct PIAuth {
 //Functions --------------------------------------------------------------------------------------------------
 #[tokio::main]
 async fn main() {
-    //Get what version we are
+    //##: Get what version we are
     let version = env!("CARGO_PKG_VERSION");
     println!("Version: {}", version);
     println!("--------------------");
@@ -124,13 +124,13 @@ async fn main() {
         }
     }
 
-    //TODO: these must handle errors better
-    //Make sure we have a good database
+    //##: TODO: these must handle errors better
+    //##: Make sure we have a good database
     if dbif::create_database(&AP_DATABASE_FILE.to_string()).is_err() {
         eprintln!("Error initializing the database file.");
     }
 
-    //Start threads to track podcast new episodes and also podping
+    //##: Start threads to track podcast new episodes and also podping
     let env_tracker_pi_api_key = env_pi_api_key.clone();
     let env_tracker_pi_api_secret = env_pi_api_secret.clone();
     thread::spawn(move || {
@@ -174,18 +174,18 @@ async fn main() {
     let some_state = "state".to_string();
 
     let mut router: Router = Router::new();
-    router.get("/profiles", Box::new(handler::profiles)); //User profile html page
-    router.get("/podcasts", Box::new(handler::podcasts)); //Actor profile page OUT
-    router.post("/podcasts", Box::new(handler::podcasts)); //Actor profile page IN
-    router.get("/inbox", Box::new(handler::inbox)); //User inbox OUT
-    router.post("/inbox", Box::new(handler::inbox)); //User inbox IN
-    router.get("/outbox", Box::new(handler::outbox)); //User outbox OUT
-    router.post("/outbox", Box::new(handler::outbox)); //User outbox IN
-    router.get("/featured", Box::new(handler::featured)); //Featured posts
-    router.get("/episodes", Box::new(handler::episodes)); //Statuses
-    router.get("/contexts", Box::new(handler::contexts)); //Contexts
-    router.get("/followers", Box::new(handler::followers)); //Followers
-    router.get("/.well-known/webfinger", Box::new(handler::webfinger)); //Webfinger
+    router.get("/profiles", Box::new(handler::profiles)); //##: User profile html page
+    router.get("/podcasts", Box::new(handler::podcasts)); //##: Actor profile page OUT
+    router.post("/podcasts", Box::new(handler::podcasts)); //##: Actor profile page IN
+    router.get("/inbox", Box::new(handler::inbox)); //##: User inbox OUT
+    router.post("/inbox", Box::new(handler::inbox)); //##: User inbox IN
+    router.get("/outbox", Box::new(handler::outbox)); //##: User outbox OUT
+    router.post("/outbox", Box::new(handler::outbox)); //##: User outbox IN
+    router.get("/featured", Box::new(handler::featured)); //##: Featured posts
+    router.get("/episodes", Box::new(handler::episodes)); //##: Statuses
+    router.get("/contexts", Box::new(handler::contexts)); //##: Contexts
+    router.get("/followers", Box::new(handler::followers)); //##: Followers
+    router.get("/.well-known/webfinger", Box::new(handler::webfinger)); //##: Webfinger
 
     let shared_router = Arc::new(router);
     let new_service = make_service_fn(move |conn: &AddrStream| {
@@ -304,7 +304,7 @@ fn episode_tracker(api_key: String, api_secret: String) {
                             match serde_json::from_str(response_body.as_str()) {
                                 Ok(data) => {
                                     let podcast_data: PIEpisodes = data;
-                                    //TODO Get this code out of this deep level of nesting
+                                    //##: TODO Get this code out of this deep level of nesting
                                     let latest_episode = podcast_data.items.get(0);
                                     if latest_episode.is_some() {
                                         let latest_episode_details = latest_episode.unwrap();
@@ -312,7 +312,7 @@ fn episode_tracker(api_key: String, api_secret: String) {
                                             //##: Loop through the followers of this podcast and send updates if there are any
 
 
-                                            //TODO, this needs to be a single shared_inbox call instead of per follower
+                                            //##: TODO, this needs to be a single shared_inbox call instead of per follower
                                             let mut shared_inboxes_called = Vec::new();
                                             for follower in followers {
                                                 if !shared_inboxes_called.contains(&follower.shared_inbox) {
@@ -335,19 +335,19 @@ fn episode_tracker(api_key: String, api_secret: String) {
                                     }
                                 }
                                 Err(e) => {
-                                    //TODO - refactor this deep nesting
+                                    //##: TODO - refactor this deep nesting
                                     eprintln!("  API response prep error: [{:#?}].\n", e);
                                 }
                             }
                         }
                         Err(e) => {
-                            //TODO - refactor this deep nesting
+                            //##: TODO - refactor this deep nesting
                             eprintln!("  API call error: [{:#?}].\n", e);
                         }
                     }
                 }
                 Err(e) => {
-                    //TODO - refactor this deep nesting
+                    //##: TODO - refactor this deep nesting
                     eprintln!("  Error getting followers from the database: [{:#?}]", e);
                     continue;
                 }
@@ -414,7 +414,7 @@ fn live_item_tracker(api_key: String, api_secret: String) {
                                                         }
                                                     }
                                                     Err(_e) => {
-                                                        //TODO - refactor this deep nesting
+                                                        //##: TODO - refactor this deep nesting
                                                     }
                                                 }
                                                 break;
@@ -422,12 +422,12 @@ fn live_item_tracker(api_key: String, api_secret: String) {
                                         }
                                     }
                                     Err(_e) => {
-                                        //TODO - refactor this deep nesting
+                                        //##: TODO - refactor this deep nesting
                                     }
                                 }
                             }
                             Err(_e) => {
-                                //TODO - refactor this deep nesting
+                                //##: TODO - refactor this deep nesting
                             }
                         }
 

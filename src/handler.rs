@@ -114,7 +114,7 @@ pub struct Actor {
     at_context: Vec<String>,
     id: String,
     r#type: String,
-    discoverable: bool,
+    discoverable: Option<bool>,
     indexable: Option<bool>,
     preferredUsername: Option<String>,
     published: Option<String>,
@@ -1551,6 +1551,9 @@ pub async fn episodes(ctx: Context) -> Response {
                             replies: None,
                         };
 
+                        //##: Are there replies to include?
+
+
                         match serde_json::to_string_pretty(&episode_data) {
                             Ok(json_result) => {
                                 episode_json = json_result;
@@ -1872,7 +1875,7 @@ fn ap_build_actor_object(podcast_data: PIPodcast, actor_keys: ActorKeys) -> Resu
         ),
         id: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
         r#type: "Person".to_string(),
-        discoverable: true,
+        discoverable: Some(true),
         preferredUsername: Some(podcast_guid.to_string()),
         name: Some(format!("{:.48}", podcast_data.feed.title).to_string()),
         inbox: format!("https://ap.podcastindex.org/inbox?id={}", podcast_guid).to_string(),
