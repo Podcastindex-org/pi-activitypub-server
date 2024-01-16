@@ -546,8 +546,15 @@ pub async fn webfinger(ctx: Context) -> Response {
         url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
     }).unwrap_or_else(HashMap::new);
 
+    //Determine HTTP action
+    let http_action = ctx.req.method().to_string();
     println!("\n\n----------");
-    println!("Request: {} from: {:#?}", ctx.req.uri(), ctx.req.headers().get("user-agent"));
+    println!("Request[{}]: {} from: {:#?}",
+             http_action,
+             ctx.req.uri(),
+             ctx.req.headers().get("user-agent")
+    );
+    //println!("Context: {:#?}", ctx);
 
     //Make sure a session param was given
     let guid;
@@ -663,10 +670,17 @@ pub async fn podcasts(ctx: Context) -> Response {
         url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
     }).unwrap_or_else(HashMap::new);
 
+    //Determine HTTP action
+    let http_action = ctx.req.method().to_string();
     println!("\n\n----------");
-    println!("Request: {} from: {:#?}", ctx.req.uri(), ctx.req.headers().get("user-agent"));
+    println!("Request[{}]: {} from: {:#?}",
+             http_action,
+             ctx.req.uri(),
+             ctx.req.headers().get("user-agent")
+    );
+    //println!("Context: {:#?}", ctx);
 
-    //Make sure a session param was given
+    //Make sure a podcast id was given
     let guid;
     match params.get("id") {
         Some(resource) => {
@@ -774,8 +788,15 @@ pub async fn profiles(ctx: Context) -> Response {
         url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
     }).unwrap_or_else(HashMap::new);
 
+    //Determine HTTP action
+    let http_action = ctx.req.method().to_string();
     println!("\n\n----------");
-    println!("Request: {} from: {:#?}", ctx.req.uri(), ctx.req.headers().get("user-agent"));
+    println!("Request[{}]: {} from: {:#?}",
+             http_action,
+             ctx.req.uri(),
+             ctx.req.headers().get("user-agent")
+    );
+    //println!("Context: {:#?}", ctx);
 
     //Make sure a session param was given
     let guid;
@@ -866,8 +887,15 @@ pub async fn outbox(ctx: Context) -> Response {
         url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
     }).unwrap_or_else(HashMap::new);
 
+    //Determine HTTP action
+    let http_action = ctx.req.method().to_string();
     println!("\n\n----------");
-    println!("Request: {} from: {:#?}", ctx.req.uri(), ctx.req.headers().get("user-agent"));
+    println!("Request[{}]: {} from: {:#?}",
+             http_action,
+             ctx.req.uri(),
+             ctx.req.headers().get("user-agent")
+    );
+    //println!("Context: {:#?}", ctx);
 
     //Make sure a session param was given
     let guid;
@@ -1044,14 +1072,13 @@ pub async fn outbox(ctx: Context) -> Response {
 
 pub async fn inbox(ctx: Context) -> Response {
 
-    //Determine HTTP action
-    let http_action = ctx.req.method().to_string();
-
     //Get query parameters
     let params: HashMap<String, String> = ctx.req.uri().query().map(|v| {
         url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
     }).unwrap_or_else(HashMap::new);
 
+    //Determine HTTP action
+    let http_action = ctx.req.method().to_string();
     println!("\n\n----------");
     println!("Request[{}]: {} from: {:#?}",
              http_action,
@@ -1060,7 +1087,7 @@ pub async fn inbox(ctx: Context) -> Response {
     );
     //println!("Context: {:#?}", ctx);
 
-    //Make sure a session param was given
+    //Make sure a podcast id was given
     let guid;
     match params.get("id") {
         Some(resource) => {
@@ -1306,8 +1333,15 @@ pub async fn featured(ctx: Context) -> Response {
         url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
     }).unwrap_or_else(HashMap::new);
 
+    //Determine HTTP action
+    let http_action = ctx.req.method().to_string();
     println!("\n\n----------");
-    println!("Request: {} from: {:#?}", ctx.req.uri(), ctx.req.headers().get("user-agent"));
+    println!("Request[{}]: {} from: {:#?}",
+             http_action,
+             ctx.req.uri(),
+             ctx.req.headers().get("user-agent")
+    );
+    //println!("Context: {:#?}", ctx);
 
     //Make sure a session param was given
     let guid;
@@ -1405,8 +1439,15 @@ pub async fn episodes(ctx: Context) -> Response {
         url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
     }).unwrap_or_else(HashMap::new);
 
+    //Determine HTTP action
+    let http_action = ctx.req.method().to_string();
     println!("\n\n----------");
-    println!("Request: {} from: {:#?}", ctx.req.uri(), ctx.req.headers().get("user-agent"));
+    println!("Request[{}]: {} from: {:#?}",
+             http_action,
+             ctx.req.uri(),
+             ctx.req.headers().get("user-agent")
+    );
+    //println!("Context: {:#?}", ctx);
 
     //Make sure a session param was given
     let podcast_guid;
@@ -1604,8 +1645,15 @@ pub async fn episodes(ctx: Context) -> Response {
 
 pub async fn contexts(ctx: Context) -> Response {
 
+    //Determine HTTP action
+    let http_action = ctx.req.method().to_string();
     println!("\n\n----------");
-    println!("Request: {} from: {:#?}", ctx.req.uri(), ctx.req.headers().get("user-agent"));
+    println!("Request[{}]: {} from: {:#?}",
+             http_action,
+             ctx.req.uri(),
+             ctx.req.headers().get("user-agent")
+    );
+    //println!("Context: {:#?}", ctx);
 
     return hyper::Response::builder()
         .status(StatusCode::OK)
@@ -1616,8 +1664,15 @@ pub async fn contexts(ctx: Context) -> Response {
 
 pub async fn followers(ctx: Context) -> Response {
 
+    //Determine HTTP action
+    let http_action = ctx.req.method().to_string();
     println!("\n\n----------");
-    println!("Request: {} from: {:#?}", ctx.req.uri(), ctx.req.headers().get("user-agent"));
+    println!("Request[{}]: {} from: {:#?}",
+             http_action,
+             ctx.req.uri(),
+             ctx.req.headers().get("user-agent")
+    );
+    //println!("Context: {:#?}", ctx);
 
     return hyper::Response::builder()
         .status(StatusCode::OK)
