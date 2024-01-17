@@ -1187,12 +1187,13 @@ pub async fn inbox(ctx: Context) -> Response {
                     .header(reqwest::header::ACCEPT, "application/activity+json")
                     .send()
                     .await;
+                println!("  FROM: [{}]", incoming_data.actor.clone().unwrap());
                 match response {
                     Ok(response) => {
                         match response.text().await {
                             Ok(response_text) => {
                                 let actor_data = serde_json::from_str::<Actor>(response_text.as_str()).unwrap();
-                                //println!("{:#?}", actor_data);
+                                println!("  ACTOR LOOKUP: [{:#?}]", actor_data);
 
                                 //Construct a response
                                 println!("  Building follow accept json.");
