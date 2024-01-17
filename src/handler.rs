@@ -696,6 +696,7 @@ pub async fn podcasts(ctx: Context) -> Response {
 
     //Make sure a podcast id was given
     let guid;
+    let mut no_guid = false;
     match params.get("id") {
         Some(resource) => {
             println!("  Id: {}\n", resource);
@@ -704,6 +705,7 @@ pub async fn podcasts(ctx: Context) -> Response {
         }
         None => {
             guid = "0".to_string();
+            no_guid = true;
             // println!("Invalid resource.\n");
             // return hyper::Response::builder()
             //     .status(StatusCode::from_u16(400).unwrap())
@@ -787,6 +789,9 @@ pub async fn podcasts(ctx: Context) -> Response {
     match ap_build_actor_object(podcast_data, actor_keys) {
         Ok(data) => {
             actor_data = data;
+            if no_guid {
+                actor_data.id = "https://ap.podcastindex.org/podcasts";
+            }
         }
         Err(e) => {
             println!("Actor object build error: [{:#?}].\n", e);
