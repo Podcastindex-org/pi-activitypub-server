@@ -27,6 +27,7 @@ The bridge uses a SQLite file for it's DB and will auto-create the file if one i
 - Watch for replies and return them in the episode status
 - Note content cleanup
 - AS2 object for media references
+- Remove all hard coded url references to ap.podcastindex.org
 
 ## Contributing
 
