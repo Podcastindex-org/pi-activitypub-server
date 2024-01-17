@@ -1192,6 +1192,7 @@ pub async fn inbox(ctx: Context) -> Response {
                     Ok(response) => {
                         match response.text().await {
                             Ok(response_text) => {
+                                println!("  ACTOR BODY: [{:#?}]", response_text.clone().as_str());
                                 let actor_data = serde_json::from_str::<Actor>(response_text.as_str()).unwrap();
                                 println!("  ACTOR LOOKUP: [{:#?}]", actor_data);
 
