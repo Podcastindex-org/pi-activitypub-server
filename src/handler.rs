@@ -785,12 +785,12 @@ pub async fn podcasts(ctx: Context) -> Response {
     }
 
     //Construct a response
-    let actor_data;
+    let mut actor_data;
     match ap_build_actor_object(podcast_data, actor_keys) {
         Ok(data) => {
             actor_data = data;
             if no_guid {
-                actor_data.id = "https://ap.podcastindex.org/podcasts";
+                actor_data.id = "https://ap.podcastindex.org/podcasts".to_string();
             }
         }
         Err(e) => {
