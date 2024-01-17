@@ -1884,7 +1884,7 @@ pub async fn api_get_episode(key: &str, secret: &str, query: &str, guid: &str) -
 }
 
 pub fn api_block_get_episodes(key: &str, secret: &str, query: &str) -> Result<String, Box<dyn Error>> {
-    println!("  PI API Request: /episodes/byfeedid");
+    //println!("  PI API Request: /episodes/byfeedid");
 
     let api_key = key;
     let api_secret = secret;
@@ -1921,11 +1921,11 @@ pub fn api_block_get_episodes(key: &str, secret: &str, query: &str) -> Result<St
     let res = client.get(url.as_str()).send();
     match res {
         Ok(res) => {
-            println!("  Response: [{}]", res.status());
+            //println!("  Response: [{}]", res.status());
             return Ok(res.text().unwrap());
         }
         Err(e) => {
-            eprintln!("  Error: [{}]", e);
+            //eprintln!("  Error: [{}]", e);
             return Err(Box::new(HydraError(format!("Error running SQL query: [{}]", e).into())));
         }
     }

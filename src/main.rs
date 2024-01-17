@@ -304,7 +304,7 @@ fn episode_tracker(api_key: String, api_secret: String) {
                     }
 
                     //##: Lookup API of podcast
-                    println!("  Podcast - [{}]", actor.pcid);
+                    //println!("  Podcast - [{}]", actor.pcid);
                     match api_block_get_episodes(
                         &api_key,
                         &api_secret,
@@ -351,7 +351,7 @@ fn episode_tracker(api_key: String, api_secret: String) {
                         }
                         Err(e) => {
                             //##: TODO - refactor this deep nesting
-                            eprintln!("  API call error: [{:#?}].\n", e);
+                            eprintln!("  PI API call error: [{:#?}].\n", e);
                         }
                     }
                 }
