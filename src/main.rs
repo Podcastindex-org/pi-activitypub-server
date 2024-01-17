@@ -292,6 +292,11 @@ fn episode_tracker(api_key: String, api_secret: String) {
 
         let mut actor_count = 0;
         for actor in actors {
+            //##: Skip instance actor
+            if actor.pcid == 0 {
+                continue;
+            }
+
             match dbif::get_followers_from_db(&AP_DATABASE_FILE.to_string(), actor.pcid) {
                 Ok(followers) => {
                     if followers.len() > 0 {
