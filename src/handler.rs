@@ -792,6 +792,11 @@ pub async fn podcasts(ctx: Context) -> Response {
             if no_guid {
                 actor_data.id = "https://ap.podcastindex.org/podcasts".to_string();
             }
+            if podcast_guid == "0" {
+                actor_data.r#type = "Application".to_string();
+                actor_data.name = Some("ap.podcastindex.org".to_string());
+                actor_data.preferredUsername = Some("ap.podcastindex.org".to_string());
+            }
         }
         Err(e) => {
             println!("Actor object build error: [{:#?}].\n", e);
