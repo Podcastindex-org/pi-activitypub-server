@@ -76,9 +76,9 @@ pub struct TagObject {
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Attachment {
-    name: String,
+    name: Option<String>,
     r#type: String,
-    value: String,
+    value: Option<String>,
 }
 
 #[allow(non_snake_case)]
@@ -2008,30 +2008,30 @@ fn ap_build_actor_object(podcast_data: PIPodcast, actor_keys: ActorKeys) -> Resu
         summary: Some(format!("{:.96}", podcast_data.feed.description)),
         attachment: Some(vec!(
             Attachment {
-                name: "Index".to_string(),
+                name: Some("Index".to_string()),
                 r#type: "PropertyValue".to_string(),
-                value: format!(
+                value: Some(format!(
                     "<a href='https://podcastindex.org/podcast/{}' rel='ugc'>https://podcastindex.org/podcast/{}</a>",
                     podcast_guid,
                     podcast_guid,
-                ).to_string(),
+                ).to_string()),
             },
             Attachment {
-                name: "Website".to_string(),
+                name: Some("Website".to_string()),
                 r#type: "PropertyValue".to_string(),
-                value: format!(
+                value: Some(format!(
                     "<a href='{}' rel='ugc'>{}</a>",
                     podcast_data.feed.link,
                     podcast_data.feed.link,
-                ).to_string(),
+                ).to_string()),
             },
             Attachment {
-                name: "Podcast Guid".to_string(),
+                name: Some("Podcast Guid".to_string()),
                 r#type: "PropertyValue".to_string(),
-                value: format!(
+                value: Some(format!(
                     "{}",
                     podcast_data.feed.podcastGuid,
-                ).to_string(),
+                ).to_string()),
             },
         )),
         publicKey: PublicKey {
