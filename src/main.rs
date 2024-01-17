@@ -290,7 +290,7 @@ fn episode_tracker(api_key: String, api_secret: String) {
             }
         }
 
-        let actor_count = 0;
+        let mut actor_count = 0;
         for actor in actors {
             match dbif::get_followers_from_db(&AP_DATABASE_FILE.to_string(), actor.pcid) {
                 Ok(followers) => {

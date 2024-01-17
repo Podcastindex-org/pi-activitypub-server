@@ -715,12 +715,12 @@ pub async fn podcasts(ctx: Context) -> Response {
 
     //Lookup API of podcast
     let podcast_data: PIPodcast;
-    let api_response = api_get_podcast(
-        &ctx.pi_auth.key,
-        &ctx.pi_auth.secret,
-        &podcast_guid,
-    ).await;
     if podcast_guid != "0" {
+        let api_response = api_get_podcast(
+            &ctx.pi_auth.key,
+            &ctx.pi_auth.secret,
+            &podcast_guid,
+        ).await;
         match api_response {
             Ok(response_body) => {
                 //eprintln!("{:#?}", response_body);
@@ -942,11 +942,12 @@ pub async fn outbox(ctx: Context) -> Response {
             guid = parts.split("@").next().unwrap().to_string();
         }
         None => {
-            println!("Invalid resource.\n");
-            return hyper::Response::builder()
-                .status(StatusCode::from_u16(400).unwrap())
-                .body(format!("No resource given.").into())
-                .unwrap();
+            guid = "0".to_string();
+            // println!("Invalid resource.\n");
+            // return hyper::Response::builder()
+            //     .status(StatusCode::from_u16(400).unwrap())
+            //     .body(format!("No resource given.").into())
+            //     .unwrap();
         }
     }
     let podcast_guid = guid.clone();
@@ -966,35 +967,45 @@ pub async fn outbox(ctx: Context) -> Response {
 
     //Lookup API of podcast
     let podcast_data: PIEpisodes;
-    let api_response = api_get_episodes(
-        &ctx.pi_auth.key,
-        &ctx.pi_auth.secret,
-        &podcast_guid,
-    ).await;
-    match api_response {
-        Ok(response_body) => {
-            //eprintln!("{:#?}", response_body);
-            match serde_json::from_str(response_body.as_str()) {
-                Ok(data) => {
-                    podcast_data = data;
-                }
-                Err(e) => {
-                    println!("Response prep error: [{:#?}].\n", e);
-                    return hyper::Response::builder()
-                        .status(StatusCode::from_u16(501).unwrap())
-                        .body(format!("Response prep error.").into())
-                        .unwrap();
+    if podcast_guid != "0" {
+        let api_response = api_get_episodes(
+            &ctx.pi_auth.key,
+            &ctx.pi_auth.secret,
+            &podcast_guid,
+        ).await;
+        match api_response {
+            Ok(response_body) => {
+                //eprintln!("{:#?}", response_body);
+                match serde_json::from_str(response_body.as_str()) {
+                    Ok(data) => {
+                        podcast_data = data;
+                    }
+                    Err(e) => {
+                        println!("Response prep error: [{:#?}].\n", e);
+                        return hyper::Response::builder()
+                            .status(StatusCode::from_u16(501).unwrap())
+                            .body(format!("Response prep error.").into())
+                            .unwrap();
+                    }
                 }
             }
+            Err(e) => {
+                println!("Response prep error: [{:#?}].\n", e);
+                return hyper::Response::builder()
+                    .status(StatusCode::from_u16(501).unwrap())
+                    .body(format!("Response prep error.").into())
+                    .unwrap();
+            }
         }
-        Err(e) => {
-            println!("Response prep error: [{:#?}].\n", e);
-            return hyper::Response::builder()
-                .status(StatusCode::from_u16(501).unwrap())
-                .body(format!("Response prep error.").into())
-                .unwrap();
+    } else {
+        //##: TODO - this should contain all episodes probably
+        podcast_data = PIEpisodes {
+            status: "true".to_string(),
+            items: vec![],
+            count: 0,
         }
     }
+
 
     //If no page=true was given, just give the outbox configuration
     let outbox_json;
