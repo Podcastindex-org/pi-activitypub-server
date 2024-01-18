@@ -2306,6 +2306,7 @@ pub fn ap_block_send_note(podcast_guid: u64, episode: &PIItem, inbox_url: String
                  <a href=\"https://fountain.fm/show/{}\">Fountain</a><br>\
                  <a href=\"https://gpodder.net/subscribe?url={}\">gPodder</a><br>\
                  <a href=\"https://overcast.fm/itunes{}\">Overcast</a><br>\
+                 <a href=\"https://pcasts.in/feed/{}\">Pocket Casts</a><br>\
                  <a href=\"https://podcastaddict.com/feed/{}\">Podcast Addict</a><br>\
                  <a href=\"https://app.podcastguru.io/podcast/{}\">Podcast Guru</a><br>\
                  <a href=\"https://api.podverse.fm/api/v1/podcast/podcastindex/{}\">Podverse</a>\
@@ -2319,6 +2320,7 @@ pub fn ap_block_send_note(podcast_guid: u64, episode: &PIItem, inbox_url: String
                 episode.feedId,
                 episode.feedUrl,
                 episode.feedItunesId.unwrap_or(0),
+                episode.feedUrl,
                 episode.feedUrl,
                 episode.feedItunesId.unwrap_or(0),
                 episode.feedId,
