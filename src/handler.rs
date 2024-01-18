@@ -129,6 +129,7 @@ pub struct Actor {
     following: Option<String>,
     icon: Option<Icon>,
     summary: Option<String>,
+    alsoKnownAs: Option<String>,
     url: Option<String>,
     manuallyApprovesFollowers: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -390,6 +391,9 @@ pub struct PIItem {
     pub duration: u64,
     pub image: String,
     pub feedImage: String,
+    pub feedUrl: String,
+    pub feedId: u64,
+    pub feedItunesId: Option<u64>,
 }
 
 #[allow(non_snake_case)]
@@ -2048,6 +2052,7 @@ fn ap_build_actor_object(podcast_data: PIPodcast, actor_keys: ActorKeys) -> Resu
         memorial: Some(false),
         published: Some("2023-11-09T15:56:28.495803Z".to_string()),
         devices: None,
+        alsoKnownAs: None,
         //tag: vec!(),
     });
 }
@@ -2240,6 +2245,14 @@ pub fn ap_block_send_note(podcast_guid: u64, episode: &PIItem, inbox_url: String
     }
 
     //##: Construct the episode note object to send
+    let episode_image = match episode.image.as_str() {
+        "" => {
+            episode.feedImage.clone()
+        }
+        _ => {
+            episode.image.clone()
+        }
+    };
     let create_action_object = Create {
         at_context: "https://www.w3.org/ns/activitystreams".to_string(),
         id: format!(
@@ -2281,16 +2294,39 @@ pub fn ap_block_send_note(podcast_guid: u64, episode: &PIItem, inbox_url: String
                 episode.guid
             ).to_string(),
             content: format!(
-                "<p>{:.256}</p><p>{:.256}</p><p>Listen: <a href=\"{}\">Listen!</a></p>",
+                "<p>New Episode!</p>\
+                {:.256}<br>\
+                {:.256}<br>\
+                Listen:<br>\
+                <a href=\"{}\">Browser</a><br>
+                <a href=\"https://antennapod.org/deeplink/subscribe?url={}\">AntennaPod</a><br>\
+                <a href=\"https://anytimeplayer.app/subscribe?url={}\">Anytime Player</a><br>\
+                <a href=\"https://curiocaster.com/podcast/pi{}\">CurioCaster</a><br>\
+                <a href=\"https://fountain.fm/show/{}\">Fountain</a><br>\
+                <a href=\"https://gpodder.net/subscribe?url={}\">gPodder</a><br>\
+                <a href=\"https://overcast.fm/itunes{}\">Overcast</a><br>\
+                <a href=\"https://podcastaddict.com/feed/{}\">Podcast Addict</a><br>\
+                <a href=\"https://app.podcastguru.io/podcast/{}\">Podcast Guru</a><br>\
+                <a href=\"https://api.podverse.fm/api/v1/podcast/podcastindex/{}\">Podverse</a>\
+                ",
                 episode.title,
                 episode.description,
                 episode.enclosureUrl,
+                episode.feedUrl,
+                episode.feedUrl,
+                episode.feedId,
+                episode.feedId,
+                episode.feedUrl,
+                episode.feedItunesId.unwrap_or(0),
+                episode.feedUrl,
+                episode.feedItunesId.unwrap_or(0),
+                episode.feedId,
             ),
             attachment: vec!(
                 NoteAttachment {
                     r#type: Some("Document".to_string()),
                     mediaType: None,
-                    url: Some(episode.feedImage.clone()),
+                    url: Some(episode_image),
                     name: None,
                     blurhash: None,
                     width: Some(640),
