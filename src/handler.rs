@@ -440,6 +440,8 @@ pub struct PILiveItem {
     pub image: String,
     pub feedImage: String,
     pub feedId: u64,
+    pub feedUrl: String,
+    pub feedItunesId: Option<u64>,
 }
 
 #[derive(Debug)]
@@ -2462,8 +2464,22 @@ pub fn ap_block_send_live_note(podcast_guid: u64, episode: &PILiveItem, inbox_ur
                 episode.guid
             ).to_string(),
             content: format!(
-                "<p>{:.256} is now Live!</p><p>Stream: <a href=\"{}\">Listen Live!</a></p>",
+                "<p>Listen Live!</p>\
+                 <p>{:.256}</p>\
+                 <p>\
+                 <a href=\"https://curiocaster.com/podcast/pi{}\">CurioCaster</a><br>\
+                 <a href=\"https://fountain.fm/show/{}\">Fountain</a><br>\
+                 <a href=\"https://podcastaddict.com/feed/{}\">Podcast Addict</a><br>\
+                 <a href=\"https://app.podcastguru.io/podcast/{}\">Podcast Guru</a><br>\
+                 <a href=\"https://api.podverse.fm/api/v1/podcast/podcastindex/{}\">Podverse</a>\
+                 </p>\
+                 <p>Or <a href=\"{}\">Stream</a> here.</p>",
                 episode.title,
+                episode.feedId,
+                episode.feedId,
+                episode.feedUrl,
+                episode.feedItunesId.unwrap_or(0),
+                episode.feedId,
                 episode.enclosureUrl,
             ),
             attachment: vec!(
