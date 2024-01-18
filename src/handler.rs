@@ -2295,32 +2295,32 @@ pub fn ap_block_send_note(podcast_guid: u64, episode: &PIItem, inbox_url: String
             ).to_string(),
             content: format!(
                 "<p>New Episode!</p>\
-                {:.256}<br>\
-                {:.256}<br>\
-                Listen:<br>\
-                <a href=\"{}\">Browser</a><br>
-                <a href=\"https://antennapod.org/deeplink/subscribe?url={}\">AntennaPod</a><br>\
-                <a href=\"https://anytimeplayer.app/subscribe?url={}\">Anytime Player</a><br>\
-                <a href=\"https://curiocaster.com/podcast/pi{}\">CurioCaster</a><br>\
-                <a href=\"https://fountain.fm/show/{}\">Fountain</a><br>\
-                <a href=\"https://gpodder.net/subscribe?url={}\">gPodder</a><br>\
-                <a href=\"https://overcast.fm/itunes{}\">Overcast</a><br>\
-                <a href=\"https://podcastaddict.com/feed/{}\">Podcast Addict</a><br>\
-                <a href=\"https://app.podcastguru.io/podcast/{}\">Podcast Guru</a><br>\
-                <a href=\"https://api.podverse.fm/api/v1/podcast/podcastindex/{}\">Podverse</a>\
-                ",
+                 <p>{:.256}</p>\
+                 <p>{:.256}</p>\
+                 <p>\
+                 <a href=\"https://antennapod.org/deeplink/subscribe?url={}\">AntennaPod</a><br>\
+                 <a href=\"https://anytimeplayer.app/subscribe?url={}\">Anytime Player</a><br>\
+                 <a href=\"https://curiocaster.com/podcast/pi{}\">CurioCaster</a><br>\
+                 <a href=\"https://fountain.fm/show/{}\">Fountain</a><br>\
+                 <a href=\"https://gpodder.net/subscribe?url={}\">gPodder</a><br>\
+                 <a href=\"https://overcast.fm/itunes{}\">Overcast</a><br>\
+                 <a href=\"https://podcastaddict.com/feed/{}\">Podcast Addict</a><br>\
+                 <a href=\"https://app.podcastguru.io/podcast/{}\">Podcast Guru</a><br>\
+                 <a href=\"https://api.podverse.fm/api/v1/podcast/podcastindex/{}\">Podverse</a>\
+                 </p>\
+                 <p>Or <a href=\"{}\">Listen</a> here.</p>",
                 episode.title,
                 episode.description,
+                episode.feedUrl,
+                episode.feedUrl,
+                episode.feedId,
+                episode.feedId,
+                episode.feedUrl,
+                episode.feedItunesId.unwrap_or(0),
+                episode.feedUrl,
+                episode.feedItunesId.unwrap_or(0),
+                episode.feedId,
                 episode.enclosureUrl,
-                episode.feedUrl,
-                episode.feedUrl,
-                episode.feedId,
-                episode.feedId,
-                episode.feedUrl,
-                episode.feedItunesId.unwrap_or(0),
-                episode.feedUrl,
-                episode.feedItunesId.unwrap_or(0),
-                episode.feedId,
             ),
             attachment: vec!(
                 NoteAttachment {
