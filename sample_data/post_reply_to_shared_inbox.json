@@ -1,0 +1,79 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    {
+      "ostatus": "http://ostatus.org#",
+      "atomUri": "ostatus:atomUri",
+      "inReplyToAtomUri": "ostatus:inReplyToAtomUri",
+      "conversation": "ostatus:conversation",
+      "sensitive": "as:sensitive",
+      "toot": "http://joinmastodon.org/ns#",
+      "votersCount": "toot:votersCount",
+      "Hashtag": "as:Hashtag"
+    }
+  ],
+  "id": "https://podcastindex.social/users/dave/statuses/111689975521776545/activity",
+  "type": "Create",
+  "actor": "https://podcastindex.social/users/dave",
+  "published": "2024-01-03T03:49:36Z",
+  "to": [
+    "https://www.w3.org/ns/activitystreams#Public"
+  ],
+  "cc": [
+    "https://podcastindex.social/users/dave/followers",
+    "https://ap.podcastindex.org/podcasts?id=6594066"
+  ],
+  "object": {
+    "id": "https://podcastindex.social/users/dave/statuses/111689975521776545",
+    "type": "Note",
+    "summary": null,
+    "inReplyTo": "https://podcastindex.social/users/dave/statuses/111683789181428177",
+    "published": "2024-01-03T03:49:36Z",
+    "url": "https://podcastindex.social/@dave/111689975521776545",
+    "attributedTo": "https://podcastindex.social/users/dave",
+    "to": [
+      "https://www.w3.org/ns/activitystreams#Public"
+    ],
+    "cc": [
+      "https://podcastindex.social/users/dave/followers",
+      "https://ap.podcastindex.org/podcasts?id=6594066"
+    ],
+    "sensitive": false,
+    "atomUri": "https://podcastindex.social/users/dave/statuses/111689975521776545",
+    "inReplyToAtomUri": "https://podcastindex.social/users/dave/statuses/111683789181428177",
+    "conversation": "tag:ap.podcastindex.org,2023-12-30T05:02:50+00:00:objectId=podserve:f69b5c6c-6c16-43e5-a9d6-3f93a2756e48:objectType=Conversation",
+    "content": "\u003cp\u003e\u003cspan class=\"h-card\" translate=\"no\"\u003e\u003ca href=\"https://ap.podcastindex.org/podcasts?id=6594066\" class=\"u-url mention\"\u003e@\u003cspan\u003e6594066\u003c/span\u003e\u003c/a\u003e\u003c/span\u003e Another test. \u003ca href=\"https://podcastindex.social/tags/ignore\" class=\"mention hashtag\" rel=\"tag\"\u003e#\u003cspan\u003eignore\u003c/span\u003e\u003c/a\u003e\u003c/p\u003e",
+    "contentMap": {
+      "en": "\u003cp\u003e\u003cspan class=\"h-card\" translate=\"no\"\u003e\u003ca href=\"https://ap.podcastindex.org/podcasts?id=6594066\" class=\"u-url mention\"\u003e@\u003cspan\u003e6594066\u003c/span\u003e\u003c/a\u003e\u003c/span\u003e Another test. \u003ca href=\"https://podcastindex.social/tags/ignore\" class=\"mention hashtag\" rel=\"tag\"\u003e#\u003cspan\u003eignore\u003c/span\u003e\u003c/a\u003e\u003c/p\u003e"
+    },
+    "attachment": [],
+    "tag": [
+      {
+        "type": "Mention",
+        "href": "https://ap.podcastindex.org/podcasts?id=6594066",
+        "name": "@6594066@ap.podcastindex.org"
+      },
+      {
+        "type": "Hashtag",
+        "href": "https://podcastindex.social/tags/ignore",
+        "name": "#ignore"
+      }
+    ],
+    "replies": {
+      "id": "https://podcastindex.social/users/dave/statuses/111689975521776545/replies",
+      "type": "Collection",
+      "first": {
+        "type": "CollectionPage",
+        "next": "https://podcastindex.social/users/dave/statuses/111689975521776545/replies?only_other_accounts=true\u0026page=true",
+        "partOf": "https://podcastindex.social/users/dave/statuses/111689975521776545/replies",
+        "items": []
+      }
+    }
+  },
+  "signature": {
+    "type": "RsaSignature2017",
+    "creator": "https://podcastindex.social/users/dave#main-key",
+    "created": "2024-01-03T03:49:37Z",
+    "signatureValue": "jMdEUGPZRTm9WEmAmdvRPlbCDW9+LcC6vyuDLcAlwLfkrR4pMNmegGMaK7A7swRKG/rYAhfMn530VkD8dKMETi3STxPGGur7cC6Bq2q0h8YBg7XG0PxKTJQWZYaEi2t7ZfLis2K1d/LXv2mkH+WOHGrJeZV4bnqZiiKonUYJ2LHmh3+Uf9ga9b2Ado/JJO3bAU2PL1rwLECmfBbwn+22YQRmGKonTIR93Y121VttVpIbuQV9XewN0K0Oolcn2WTp//jIiPtbM5FoKFyEUActAvRZqh8Oisezamr246nE+oknEpUxGUv6Tbf3NeCkZPQMtTHgONgGFDJVZjC+Ocbabg=="
+  }
+}
