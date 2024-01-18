@@ -129,7 +129,7 @@ pub struct Actor {
     following: Option<String>,
     icon: Option<Icon>,
     summary: Option<String>,
-    alsoKnownAs: Option<String>,
+    //alsoKnownAs: Option<String>,
     url: Option<String>,
     manuallyApprovesFollowers: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2054,7 +2054,7 @@ fn ap_build_actor_object(podcast_data: PIPodcast, actor_keys: ActorKeys) -> Resu
         memorial: Some(false),
         published: Some("2023-11-09T15:56:28.495803Z".to_string()),
         devices: None,
-        alsoKnownAs: None,
+        //alsoKnownAs: None,
         //tag: vec!(),
     });
 }
