@@ -392,6 +392,7 @@ pub struct PIItem {
     pub image: String,
     pub feedImage: String,
     pub feedUrl: String,
+    pub podcastGuid: String,
     pub feedId: u64,
     pub feedItunesId: Option<u64>,
 }
@@ -441,6 +442,7 @@ pub struct PILiveItem {
     pub feedImage: String,
     pub feedId: u64,
     pub feedUrl: String,
+    pub podcastGuid: String,
     pub feedItunesId: Option<u64>,
 }
 
@@ -2302,6 +2304,7 @@ pub fn ap_block_send_note(podcast_guid: u64, episode: &PIItem, inbox_url: String
                  <p>\
                  <a href=\"https://antennapod.org/deeplink/subscribe?url={}\">AntennaPod</a><br>\
                  <a href=\"https://anytimeplayer.app/subscribe?url={}\">Anytime Player</a><br>\
+                 <a href=\"https://castamatic.com/guid/{}\">Castamatic</a><br>\
                  <a href=\"https://curiocaster.com/podcast/pi{}\">CurioCaster</a><br>\
                  <a href=\"https://fountain.fm/show/{}\">Fountain</a><br>\
                  <a href=\"https://gpodder.net/subscribe?url={}\">gPodder</a><br>\
@@ -2309,13 +2312,16 @@ pub fn ap_block_send_note(podcast_guid: u64, episode: &PIItem, inbox_url: String
                  <a href=\"https://pcasts.in/feed/{}\">Pocket Casts</a><br>\
                  <a href=\"https://podcastaddict.com/feed/{}\">Podcast Addict</a><br>\
                  <a href=\"https://app.podcastguru.io/podcast/{}\">Podcast Guru</a><br>\
+                 <a href=\"https://podnews.net/podcast/pi{}\">Podnews</a><br>\
                  <a href=\"https://api.podverse.fm/api/v1/podcast/podcastindex/{}\">Podverse</a>\
+                 <a href=\"https://truefans.fm/{}\">Truefans</a>\
                  </p>\
                  <p>Or <a href=\"{}\">Listen</a> here.</p>",
                 episode.title,
                 episode.description,
                 episode.feedUrl,
                 episode.feedUrl,
+                episode.podcastGuid,
                 episode.feedId,
                 episode.feedId,
                 episode.feedUrl,
@@ -2324,6 +2330,8 @@ pub fn ap_block_send_note(podcast_guid: u64, episode: &PIItem, inbox_url: String
                 episode.feedUrl,
                 episode.feedItunesId.unwrap_or(0),
                 episode.feedId,
+                episode.feedId,
+                episode.podcastGuid,
                 episode.enclosureUrl,
             ),
             attachment: vec!(
@@ -2474,6 +2482,7 @@ pub fn ap_block_send_live_note(podcast_guid: u64, episode: &PILiveItem, inbox_ur
                  <a href=\"https://podcastaddict.com/feed/{}\">Podcast Addict</a><br>\
                  <a href=\"https://app.podcastguru.io/podcast/{}\">Podcast Guru</a><br>\
                  <a href=\"https://api.podverse.fm/api/v1/podcast/podcastindex/{}\">Podverse</a>\
+                 <a href=\"https://truefans.fm/{}\">Truefans</a>\
                  </p>\
                  <p>Or <a href=\"{}\">Stream</a> here.</p>",
                 episode.title,
@@ -2482,6 +2491,7 @@ pub fn ap_block_send_live_note(podcast_guid: u64, episode: &PILiveItem, inbox_ur
                 episode.feedUrl,
                 episode.feedItunesId.unwrap_or(0),
                 episode.feedId,
+                episode.podcastGuid,
                 episode.enclosureUrl,
             ),
             attachment: vec!(
