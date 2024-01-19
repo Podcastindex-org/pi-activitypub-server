@@ -1871,6 +1871,8 @@ pub async fn api_get_episode(key: &str, secret: &str, query: &str, guid: &str) -
         urlencoding::encode(query)
     );
 
+    println!("  PI API Request: [{}]", url);
+
     //##: Build the query with the required headers
     let mut headers = header::HeaderMap::new();
     headers.insert("User-Agent", header::HeaderValue::from_static("Rust-podcastindex-org-example/v1.0"));
