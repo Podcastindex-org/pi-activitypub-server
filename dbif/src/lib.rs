@@ -2,43 +2,8 @@ use rusqlite::{params, Connection};
 use std::error::Error;
 use std::fmt;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::os::unix::fs::PermissionsExt;
 
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct BoostRecord {
-    pub index: u64,
-    pub time: i64,
-    pub value_msat: i64,
-    pub value_msat_total: i64,
-    pub action: u8,
-    pub sender: String,
-    pub app: String,
-    pub message: String,
-    pub podcast: String,
-    pub episode: String,
-    pub tlv: String,
-    pub remote_podcast: Option<String>,
-    pub remote_episode: Option<String>,
-}
-
-impl BoostRecord {
-    //Removes unsafe html interpretable characters from displayable strings
-    pub fn escape_for_html(field: String) -> String {
-        return field.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
-    }
-
-    //Removes unsafe html interpretable characters from displayable strings
-    pub fn escape_for_csv(field: String) -> String {
-        return field.replace("\"", "\"\"").replace("\n", " ");
-    }
-
-    //Parses the TLV record into a Value
-    pub fn parse_tlv(&self) -> Result<Value, Box<dyn Error>> {
-        return Ok(serde_json::from_str(self.tlv.as_str())?);
-    }
-}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ActorRecord {
