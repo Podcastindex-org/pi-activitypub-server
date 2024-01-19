@@ -2315,7 +2315,7 @@ pub fn ap_block_send_note(podcast_guid: u64, episode: &PIItem, inbox_url: String
                  <a href=\"https://podcastaddict.com/feed/{}\">Podcast Addict</a><br>\
                  <a href=\"https://app.podcastguru.io/podcast/{}\">Podcast Guru</a><br>\
                  <a href=\"https://podnews.net/podcast/pi{}\">Podnews</a><br>\
-                 <a href=\"https://api.podverse.fm/api/v1/podcast/podcastindex/{}\">Podverse</a>\
+                 <a href=\"https://api.podverse.fm/api/v1/podcast/podcastindex/{}\">Podverse</a><br>\
                  <a href=\"https://truefans.fm/{}\">Truefans</a>\
                  </p>\
                  <p>Or <a href=\"{}\">Listen</a> here.</p>",
@@ -2483,7 +2483,7 @@ pub fn ap_block_send_live_note(podcast_guid: u64, episode: &PILiveItem, inbox_ur
                  <a href=\"https://fountain.fm/show/{}\">Fountain</a><br>\
                  <a href=\"https://podcastaddict.com/feed/{}\">Podcast Addict</a><br>\
                  <a href=\"https://app.podcastguru.io/podcast/{}\">Podcast Guru</a><br>\
-                 <a href=\"https://api.podverse.fm/api/v1/podcast/podcastindex/{}\">Podverse</a>\
+                 <a href=\"https://api.podverse.fm/api/v1/podcast/podcastindex/{}\">Podverse</a><br>\
                  <a href=\"https://truefans.fm/{}\">Truefans</a>\
                  </p>\
                  <p>Or <a href=\"{}\">Stream</a> here.</p>",
