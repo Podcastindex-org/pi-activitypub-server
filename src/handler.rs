@@ -406,11 +406,13 @@ pub struct PIItem {
     pub socialInteract: Option<PISocialInteract>,
 }
 
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize)]
 pub enum PISocialInteractProtocol {
-    activitypub,
-    xmpp,
-    bluesky,
-    nostr,
+    Activitypub,
+    Xmpp,
+    Bluesky,
+    Nostr,
 }
 
 #[allow(non_snake_case)]
@@ -2301,10 +2303,13 @@ pub fn ap_block_send_note(podcast_guid: u64, episode: &PIItem, inbox_url: String
     }
 
     //##: Construct the episode note object to send
-    let episode_social_interact_uri;
-    match episode.socialInteract {
+    let episode_social_interact_uri: String;
+    match &episode.socialInteract {
         Some(social_interact) => {
-            let episode_social_interact_uri = social_interact.uri.unwrap_or("".to_string());
+            episode_social_interact_uri = social_interact.uri.clone().unwrap_or("".to_string());
+        }
+        None => {
+            episode_social_interact_uri = "".to_string();
         }
     }
     let episode_image = match episode.image.as_str() {
