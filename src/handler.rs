@@ -403,6 +403,24 @@ pub struct PIItem {
     pub podcastGuid: String,
     pub feedId: u64,
     pub feedItunesId: Option<u64>,
+    pub socialInteract: Option<PISocialInteract>,
+}
+
+pub enum PISocialInteractProtocol {
+    activitypub,
+    xmpp,
+    bluesky,
+    nostr,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize)]
+pub struct PISocialInteract {
+    pub uri: Option<String>,
+    pub protocol: Option<PISocialInteractProtocol>,
+    pub accountId: Option<String>,
+    pub accountUrl: Option<String>,
+    pub priority: Option<u64>,
 }
 
 #[allow(non_snake_case)]
@@ -2283,6 +2301,12 @@ pub fn ap_block_send_note(podcast_guid: u64, episode: &PIItem, inbox_url: String
     }
 
     //##: Construct the episode note object to send
+    let episode_social_interact_uri;
+    match episode.socialInteract {
+        Some(social_interact) => {
+            let episode_social_interact_uri = social_interact.uri.unwrap_or("".to_string());
+        }
+    }
     let episode_image = match episode.image.as_str() {
         "" => {
             episode.feedImage.clone()
@@ -2332,10 +2356,8 @@ pub fn ap_block_send_note(podcast_guid: u64, episode: &PIItem, inbox_url: String
                 episode.guid
             ).to_string(),
             content: format!(
-                "<p>\
-                   <a href=\"https://podcastindex.org/podcast/{}?episode={}\">New Episode!</a>\
-                 </p>\
-                 <p>{:.256}</p>\
+                "<p>New Episode: <a href=\"https://podcastindex.org/podcast/{}?episode={}\">{:.256}</a></p>\
+                 <p>Shownotes:<br>{:.256}</p>\
                  <p>\
                    <a href=\"https://antennapod.org/deeplink/subscribe?url={}\">AntennaPod</a><br>\
                    <a href=\"https://anytimeplayer.app/subscribe?url={}\">Anytime Player</a><br>\
@@ -2352,8 +2374,7 @@ pub fn ap_block_send_note(podcast_guid: u64, episode: &PIItem, inbox_url: String
                    <a href=\"https://truefans.fm/{}\">Truefans</a>\
                  </p>\
                  <p>Or <a href=\"{}\">Listen</a> right here.</p>\
-                 <p>Shownotes:<br>\
-                 {:.256}</p>\
+                 {}\
                 ",
                 episode.feedId,
                 episode.id,
@@ -2373,6 +2394,7 @@ pub fn ap_block_send_note(podcast_guid: u64, episode: &PIItem, inbox_url: String
                 episode.feedId,
                 episode.podcastGuid,
                 episode.enclosureUrl,
+                episode_social_interact_uri
             ),
             attachment: vec!(
                 NoteAttachment {
