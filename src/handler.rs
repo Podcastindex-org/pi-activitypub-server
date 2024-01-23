@@ -367,6 +367,14 @@ pub struct PIFeed {
     pub image: String,
     pub artwork: String,
     pub episodeCount: u64,
+    pub funding: Option<PIFunding>,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize)]
+pub struct PIFunding {
+    url: Option<String>,
+    message: Option<String>,
 }
 
 #[allow(non_snake_case)]
@@ -491,7 +499,8 @@ impl FromStr for InboxRequestObject {
     }
 }
 
-//Functions ------------------------------------------------------------------------------------------------------------
+
+//Operational Functions ------------------------------------------------------------------------------------------------
 fn d_blank_inboxrequest() -> InboxRequestObject {
     InboxRequestObject {
         id: "".to_string(),
@@ -723,7 +732,7 @@ pub async fn podcasts(ctx: Context) -> Response {
     }
     let podcast_guid = guid.clone();
 
-    //Lookup API of podcast
+    //##: Lookup API of podcast
     let podcast_data: PIPodcast;
     if podcast_guid != "0" {
         let api_response = api_get_podcast(
@@ -773,11 +782,12 @@ pub async fn podcasts(ctx: Context) -> Response {
                 image: "https://noagendaassets.com/enc/1684513486.722_pcifeedimage.png".to_string(),
                 artwork: "https://noagendaassets.com/enc/1684513486.722_pcifeedimage.png".to_string(),
                 episodeCount: 0,
+                funding: None,
             },
         }
     }
 
-    //If no keypair exists, create one
+    //##: If no keypair exists, create one
     let actor_keys;
     match ap_get_actor_keys(podcast_guid.parse::<u64>().unwrap()) {
         Ok(keys) => {
@@ -1182,10 +1192,14 @@ pub async fn inbox(ctx: Context) -> Response {
     match inbox_request {
         Ok(incoming_data) => {
             //TODO: This should all be in separate functions
+
+            //##: DELETE
             if incoming_data.r#type.to_lowercase() == "delete" {
                 //TODO: Ignoring this for now
                 println!("--Delete request: {:#?}", incoming_data);
                 println!("  BODY: {}", body);
+
+            //##: FOLLOW
             } else if incoming_data.r#type.to_lowercase() == "follow" {
                 println!("--Follow request");
                 let client = reqwest::Client::new();
@@ -1297,6 +1311,8 @@ pub async fn inbox(ctx: Context) -> Response {
                             .unwrap();
                     }
                 }
+
+            //##: UNDO
             } else if incoming_data.r#type.to_lowercase() == "undo" {
                 //##: Un-follow
                 println!("--Unfollow request");
@@ -1312,11 +1328,14 @@ pub async fn inbox(ctx: Context) -> Response {
                         status: "".to_string(),
                     });
                 }
+
+            //: CREATE
             } else if incoming_data.r#type.to_lowercase() == "create" {
                 //##: Create
                 println!("--Create request: {:#?}", incoming_data);
                 println!("  BODY: {}", body);
 
+                //##: Replies
                 //##: Parse out the inReplyTo so we can determine which podcast this belongs to
                 if incoming_data.object.inReplyTo.is_some()
                     && incoming_data.object.content.is_some()
@@ -1364,6 +1383,8 @@ pub async fn inbox(ctx: Context) -> Response {
                         }
                     }
                 }
+
+            //##: UNHANDLED
             } else {
                 println!("--Unhandled request: {:#?}", incoming_data);
                 println!("  BODY: {}", body);
@@ -1991,6 +2012,7 @@ pub fn api_block_get_live_items(key: &str, secret: &str, query: &str) -> Result<
     }
 }
 
+
 //ActivityPub helper functions -------------------------------------------------------------------------------
 fn ap_build_actor_object(podcast_data: PIPodcast, actor_keys: ActorKeys) -> Result<Actor, Box<dyn Error>> {
     let podcast_guid = podcast_data.feed.id;
@@ -2034,6 +2056,16 @@ fn ap_build_actor_object(podcast_data: PIPodcast, actor_keys: ActorKeys) -> Resu
                     podcast_data.feed.link,
                     podcast_data.feed.link,
                 ).to_string()),
+            },
+            Attachment {
+                name: Some("RSS".to_string()),
+                r#type: "PropertyValue".to_string(),
+                value: Some(format!("{}",podcast_data.feed.url).to_string()),
+            },
+            Attachment {
+                name: Some("RSS".to_string()),
+                r#type: "PropertyValue".to_string(),
+                value: Some(format!("{}",podcast_data.feed.url).to_string()),
             },
             Attachment {
                 name: Some("Podcast Guid".to_string()),
@@ -2300,25 +2332,31 @@ pub fn ap_block_send_note(podcast_guid: u64, episode: &PIItem, inbox_url: String
                 episode.guid
             ).to_string(),
             content: format!(
-                "<p>New Episode!</p>\
-                 <p>{:.256}</p>\
+                "<p>\
+                   <a href=\"https://podcastindex.org/podcast/{}?episode={}\">New Episode!</a>\
+                 </p>\
                  <p>{:.256}</p>\
                  <p>\
-                 <a href=\"https://antennapod.org/deeplink/subscribe?url={}\">AntennaPod</a><br>\
-                 <a href=\"https://anytimeplayer.app/subscribe?url={}\">Anytime Player</a><br>\
-                 <a href=\"https://castamatic.com/guid/{}\">Castamatic</a><br>\
-                 <a href=\"https://curiocaster.com/podcast/pi{}\">CurioCaster</a><br>\
-                 <a href=\"https://fountain.fm/show/{}\">Fountain</a><br>\
-                 <a href=\"https://gpodder.net/subscribe?url={}\">gPodder</a><br>\
-                 <a href=\"https://overcast.fm/itunes{}\">Overcast</a><br>\
-                 <a href=\"https://pcasts.in/feed/{}\">Pocket Casts</a><br>\
-                 <a href=\"https://podcastaddict.com/feed/{}\">Podcast Addict</a><br>\
-                 <a href=\"https://app.podcastguru.io/podcast/{}\">Podcast Guru</a><br>\
-                 <a href=\"https://podnews.net/podcast/pi{}\">Podnews</a><br>\
-                 <a href=\"https://api.podverse.fm/api/v1/podcast/podcastindex/{}\">Podverse</a><br>\
-                 <a href=\"https://truefans.fm/{}\">Truefans</a>\
+                   <a href=\"https://antennapod.org/deeplink/subscribe?url={}\">AntennaPod</a><br>\
+                   <a href=\"https://anytimeplayer.app/subscribe?url={}\">Anytime Player</a><br>\
+                   <a href=\"https://castamatic.com/guid/{}\">Castamatic</a><br>\
+                   <a href=\"https://curiocaster.com/podcast/pi{}\">CurioCaster</a><br>\
+                   <a href=\"https://fountain.fm/show/{}\">Fountain</a><br>\
+                   <a href=\"https://gpodder.net/subscribe?url={}\">gPodder</a><br>\
+                   <a href=\"https://overcast.fm/itunes{}\">Overcast</a><br>\
+                   <a href=\"https://pcasts.in/feed/{}\">Pocket Casts</a><br>\
+                   <a href=\"https://podcastaddict.com/feed/{}\">Podcast Addict</a><br>\
+                   <a href=\"https://app.podcastguru.io/podcast/{}\">Podcast Guru</a><br>\
+                   <a href=\"https://podnews.net/podcast/pi{}\">Podnews</a><br>\
+                   <a href=\"https://api.podverse.fm/api/v1/podcast/podcastindex/{}\">Podverse</a><br>\
+                   <a href=\"https://truefans.fm/{}\">Truefans</a>\
                  </p>\
-                 <p>Or <a href=\"{}\">Listen</a> here.</p>",
+                 <p>Or <a href=\"{}\">Listen</a> right here.</p>\
+                 <p>Shownotes:<br>\
+                 {:.256}</p>\
+                ",
+                episode.feedId,
+                episode.id,
                 episode.title,
                 episode.description,
                 episode.feedUrl,
