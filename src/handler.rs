@@ -1362,7 +1362,7 @@ pub async fn inbox(ctx: Context) -> Response {
                 if incoming_data.object.inReplyTo.is_some()
                     && incoming_data.object.content.is_some()
                 {
-                    let in_reply_to_url = incoming_data.object.inReplyTo.unwrap();
+                    let in_reply_to_url = incoming_data.object.inReplyTo.clone().unwrap();
                     let parent_pcid = get_id_from_url(in_reply_to_url.clone());
                     let parent_episode_guid = get_statusid_from_url(in_reply_to_url.clone());
                     let received_time = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time mismatch.").as_secs();
@@ -1376,7 +1376,7 @@ pub async fn inbox(ctx: Context) -> Response {
                             objectid: incoming_data.object.id,
                             objecttype: incoming_data.object.r#type.unwrap_or("".to_string()),
                             attributedto: incoming_data.object.attributedTo.unwrap_or("".to_string()),
-                            content: incoming_data.object.content.unwrap(),
+                            content: incoming_data.object.content.clone().unwrap(),
                             sensitive: 0,
                             published: incoming_data.object.published.unwrap_or(received_time.to_string()),
                             received: received_time,
@@ -1395,13 +1395,49 @@ pub async fn inbox(ctx: Context) -> Response {
                                 objectid: incoming_data.object.id,
                                 objecttype: incoming_data.object.r#type.unwrap_or("".to_string()),
                                 attributedto: incoming_data.object.attributedTo.unwrap_or("".to_string()),
-                                content: incoming_data.object.content.unwrap(),
+                                content: incoming_data.object.content.clone().unwrap(),
                                 sensitive: 0,
                                 published: incoming_data.object.published.unwrap_or(received_time.to_string()),
                                 received: received_time,
                                 conversation: reply_conversation.clone(),
                             });
                             break;
+                        }
+                    }
+                }
+
+                //##: PI Action Requests
+                if incoming_data.object.cc.is_some()
+                    && incoming_data.object.inReplyTo.is_none()
+                    && incoming_data.object.content.is_some()
+                {
+                    for cc in incoming_data.object.cc.unwrap() {
+                        let mut parent_pcid= 0;
+                        match get_id_from_url(cc).parse::<u64>() {
+                            Ok(pcid) => {
+                                parent_pcid = pcid;
+                            }
+                            Err(e) => {
+                                eprintln!("Failed to ascertain podcast id: [{}].\n", e);
+                            }
+                        }
+
+                        if parent_pcid > 0 {
+                            if incoming_data.object.content.clone().unwrap().contains("rescan") {
+                                let _ = api_hub_rescan(
+                                    &ctx.pi_auth.key,
+                                    &ctx.pi_auth.secret,
+                                    &podcast_guid,
+                                );
+                            }
+                        }
+
+                        if incoming_data.actor.is_some() {
+                            let _ = ap_block_send_note(
+                                parent_pcid,
+                                format!("{}/inbox", incoming_data.actor.clone().unwrap()).to_string(),
+                                "Done.".to_string()
+                            );
                         }
                     }
                 }
@@ -1813,6 +1849,54 @@ pub async fn api_get_podcast(key: &str, secret: &str, query: &str) -> Result<Str
     //##: Set up the parameters and the api endpoint url to call and make sure all params are
     //##: url encoded before sending.
     let url: String = format!("https://api.podcastindex.org/api/1.0/podcasts/byfeedid?id={}", urlencoding::encode(query));
+
+    //##: Build the query with the required headers
+    let mut headers = header::HeaderMap::new();
+    headers.insert("User-Agent", header::HeaderValue::from_static("Rust-podcastindex-org-example/v1.0"));
+    headers.insert("X-Auth-Date", header::HeaderValue::from_str(api_time.as_str()).unwrap());
+    headers.insert("X-Auth-Key", header::HeaderValue::from_str(api_key).unwrap());
+    headers.insert("Authorization", header::HeaderValue::from_str(api_hash.as_str()).unwrap());
+    let client = reqwest::Client::builder().default_headers(headers).build().unwrap();
+
+    //##: Send the request and display the results or the error
+    let res = client.get(url.as_str()).send();
+    match res.await {
+        Ok(res) => {
+            println!("  Response: [{}]", res.status());
+            return Ok(res.text().await.unwrap());
+        }
+        Err(e) => {
+            eprintln!("  Error: [{}]", e);
+            return Err(Box::new(HydraError(format!("Error running SQL query: [{}]", e).into())));
+        }
+    }
+}
+
+pub async fn api_hub_rescan(key: &str, secret: &str, query: &str) -> Result<String, Box<dyn Error>> {
+    println!("PI HUB Request: /pubnotify?id={}", query);
+
+    let api_key = key;
+    let api_secret = secret;
+
+    //##: ======== Required values ========
+    //##: WARNING: don't publish these to public repositories or in public places!
+    //##: NOTE: values below are sample values, to get your own values go to https://api.podcastindex.org
+    let api_time = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time mismatch.").as_secs().to_string();
+
+    //##: Create the authorization token.
+    //##: The auth token is built by creating an sha1 hash of the key, secret and current time (as a string)
+    //##: concatenated together. The hash is a lowercase string.
+    let data4hash: String = format!("{}{}{}", api_key, api_secret, api_time);
+    //println!("Data to hash: [{}]", data4hash);
+    let mut hasher = Sha1::new();
+    hasher.update(data4hash);
+    let authorization_token = hasher.finalize();
+    let api_hash: String = format!("{:X}", authorization_token).to_lowercase();
+    //println!("Hash String: [{}]", api_hash);
+
+    //##: Set up the parameters and the api endpoint url to call and make sure all params are
+    //##: url encoded before sending.
+    let url: String = format!("https://hub.podcastindex.org/pubnotify?id={}", urlencoding::encode(query));
 
     //##: Build the query with the required headers
     let mut headers = header::HeaderMap::new();
@@ -2312,7 +2396,133 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
     }
 }
 
-pub fn ap_block_send_note(podcast_guid: u64, episode: &PIItem, inbox_url: String) -> Result<String, Box<dyn Error>> {
+pub fn ap_block_send_note(podcast_guid: u64, inbox_url: String, note: String) -> Result<String, Box<dyn Error>> {
+    println!("  AP Sending create episode note from actor: {}", podcast_guid);
+
+    //##: Get actor keys for guid
+    let actor_keys = ap_get_actor_keys(podcast_guid).unwrap();
+
+    //##: Decode the private key for the podcast actor
+    let private_key;
+    match crypto_rsa::rsa_private_key_from_pkcs1_pem(&actor_keys.pem_private_key) {
+        Ok(pem_decoded_privkey) => {
+            private_key = pem_decoded_privkey;
+        }
+        Err(e) => {
+            return Err(Box::new(HydraError(format!("Error decoding private key: [{}]", e).into())));
+        }
+    }
+
+    //##: Construct the note object to send
+    let create_action_object = Create {
+        at_context: "https://www.w3.org/ns/activitystreams".to_string(),
+        id: format!(
+            "https://ap.podcastindex.org/notes?id={}&statusid={}&resource=activity",
+            podcast_guid,
+            SystemTime::now().duration_since(UNIX_EPOCH).expect("Time mismatch.").as_secs()
+        ).to_string(),
+        r#type: "Create".to_string(),
+        actor: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
+        published: iso8601(SystemTime::now().duration_since(UNIX_EPOCH).expect("Time mismatch.").as_secs()),
+        to: vec!(
+            "https://www.w3.org/ns/activitystreams#Public".to_string()
+        ),
+        cc: None,
+        object: Object {
+            id: format!(
+                "https://ap.podcastindex.org/notes?id={}&statusid={}&resource=post",
+                podcast_guid,
+                SystemTime::now().duration_since(UNIX_EPOCH).expect("Time mismatch.").as_secs()
+            ).to_string(),
+            r#type: "Note".to_string(),
+            summary: None,
+            inReplyTo: None,
+            published: iso8601(SystemTime::now().duration_since(UNIX_EPOCH).expect("Time mismatch.").as_secs()),
+            url: format!(
+                "https://ap.podcastindex.org/notes?id={}&statusid={}&resource=public",
+                podcast_guid,
+                SystemTime::now().duration_since(UNIX_EPOCH).expect("Time mismatch.").as_secs()
+            ).to_string(),
+            attributedTo: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
+            to: vec!(
+                "https://www.w3.org/ns/activitystreams#Public".to_string()
+            ),
+            cc: None,
+            sensitive: false,
+            conversation: format!(
+                "tag:ap.podcastindex.org,{}:objectId={}:objectType=Conversation",
+                iso8601(SystemTime::now().duration_since(UNIX_EPOCH).expect("Time mismatch.").as_secs()),
+                SystemTime::now().duration_since(UNIX_EPOCH).expect("Time mismatch.").as_secs()
+            ).to_string(),
+            content: format!("{}", note),
+            attachment: vec!(),
+        },
+    };
+    //##: Convert the note create action to JSON and send
+    let create_json;
+    match serde_json::to_string_pretty(&create_action_object) {
+        Ok(json_result) => {
+            create_json = json_result;
+        }
+        Err(e) => {
+            eprintln!("Response prep error: [{:#?}].\n", e);
+            return Err(Box::new(HydraError(format!("Error building create note request json: [{}]", e).into())));
+        }
+    }
+
+    //##: Build the http signing headers
+    let key_id = format!("https://ap.podcastindex.org/podcasts?id={}#main-key", podcast_guid);
+    let http_signature_headers;
+    match http_signature::create_http_signature(
+        http::Method::POST,
+        &inbox_url,
+        &create_json.clone(),
+        &private_key,
+        &key_id,
+    ) {
+        Ok(sig_headers) => {
+            http_signature_headers = sig_headers;
+        }
+        Err(e) => {
+            return Err(Box::new(HydraError(format!("Could not build http signature headers: [{}]", e).into())));
+        }
+    }
+
+    //##: Build the query with the required headers
+    let mut headers = header::HeaderMap::new();
+    headers.insert("User-Agent", header::HeaderValue::from_static("Podcast Index AP/v0.1.2a"));
+    headers.insert("Accept", header::HeaderValue::from_static("application/activity+json"));
+    headers.insert("Content-type", header::HeaderValue::from_static("application/activity+json"));
+    headers.insert("date", header::HeaderValue::from_str(&http_signature_headers.date).unwrap());
+    headers.insert("host", header::HeaderValue::from_str(&http_signature_headers.host).unwrap());
+    headers.insert("digest", header::HeaderValue::from_str(&http_signature_headers.digest.unwrap()).unwrap());
+    headers.insert("signature", header::HeaderValue::from_str(&http_signature_headers.signature).unwrap());
+    let client = reqwest::blocking::Client::builder()
+        .default_headers(headers)
+        .build()
+        .unwrap();
+
+    //##: Send the Accept request
+    println!("  NOTE SENT: [{}|{}|{}]", podcast_guid, note, inbox_url.as_str());
+    let res = client
+        .post(inbox_url.as_str())
+        .body(create_json)
+        .send();
+    match res {
+        Ok(res) => {
+            println!("  Response: [{:#?}]", res);
+            let res_body = res.text()?;
+            println!("  Body: [{:#?}]", res_body);
+            return Ok(res_body);
+        }
+        Err(e) => {
+            eprintln!("  Error: [{}]", e);
+            return Err(Box::new(HydraError(format!("Error sending episode create note request: [{}]", e).into())));
+        }
+    }
+}
+
+pub fn ap_block_send_episode_note(podcast_guid: u64, episode: &PIItem, inbox_url: String) -> Result<String, Box<dyn Error>> {
     println!("  AP Sending create episode note from actor: {}", podcast_guid);
 
     //##: Get actor keys for guid

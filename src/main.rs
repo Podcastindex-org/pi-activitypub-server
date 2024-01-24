@@ -10,7 +10,7 @@ use std::time::{Duration};
 use serde::{Deserialize, Serialize};
 use crate::handler::{
     api_block_get_episodes,
-    ap_block_send_note,
+    ap_block_send_episode_note,
     ap_block_send_live_note,
     PIEpisodes,
     PILiveItems,
@@ -326,7 +326,7 @@ fn episode_tracker(api_key: String, api_secret: String) {
                                             let mut shared_inboxes_called = Vec::new();
                                             for follower in followers {
                                                 if !shared_inboxes_called.contains(&follower.shared_inbox) {
-                                                    let _ = ap_block_send_note(
+                                                    let _ = ap_block_send_episode_note(
                                                         actor.pcid,
                                                         latest_episode_details,
                                                         follower.shared_inbox.clone(),
