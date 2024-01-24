@@ -403,7 +403,7 @@ pub struct PIItem {
     pub podcastGuid: String,
     pub feedId: u64,
     pub feedItunesId: Option<u64>,
-    pub socialInteract: Option<PISocialInteract>,
+    pub socialInteract: Option<Vec<PISocialInteract>>,
 }
 
 #[allow(non_snake_case)]
@@ -2328,10 +2328,13 @@ pub fn ap_block_send_note(podcast_guid: u64, episode: &PIItem, inbox_url: String
     }
 
     //##: Construct the episode note object to send
-    let episode_social_interact_uri: String;
+    let mut episode_social_interact_uri = "".to_string();
     match &episode.socialInteract {
-        Some(social_interact) => {
-            episode_social_interact_uri = social_interact.uri.clone().unwrap_or("".to_string());
+        Some(social_interacts) => {
+            for social_interact in social_interacts {
+                episode_social_interact_uri = social_interact.uri.clone().unwrap_or("".to_string());
+                break;
+            }
         }
         None => {
             episode_social_interact_uri = "".to_string();
