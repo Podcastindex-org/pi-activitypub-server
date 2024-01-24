@@ -345,7 +345,7 @@ fn episode_tracker(api_key: String, api_secret: String) {
                                 }
                                 Err(e) => {
                                     //##: TODO - refactor this deep nesting
-                                    eprintln!("  API response prep error: [{:#?}].\n", e);
+                                    eprintln!("  API response prep error: [{:#?}] actor guid: [{}].\n", e, actor.pcid);
                                 }
                             }
                         }
