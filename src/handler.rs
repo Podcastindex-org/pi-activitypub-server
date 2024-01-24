@@ -1219,7 +1219,7 @@ pub async fn inbox(ctx: Context) -> Response {
                 println!("--Delete request: {:#?}", incoming_data);
                 println!("  BODY: {}", body);
 
-            //##: FOLLOW
+                //##: FOLLOW
             } else if incoming_data.r#type.to_lowercase() == "follow" {
                 println!("--Follow request");
                 let client = reqwest::Client::new();
@@ -1332,7 +1332,7 @@ pub async fn inbox(ctx: Context) -> Response {
                     }
                 }
 
-            //##: UNDO
+                //##: UNDO
             } else if incoming_data.r#type.to_lowercase() == "undo" {
                 //##: Un-follow
                 println!("--Unfollow request");
@@ -1349,7 +1349,7 @@ pub async fn inbox(ctx: Context) -> Response {
                     });
                 }
 
-            //: CREATE
+                //: CREATE
             } else if incoming_data.r#type.to_lowercase() == "create" {
                 //##: Create
                 println!("--Create request: {:#?}", incoming_data);
@@ -1404,7 +1404,7 @@ pub async fn inbox(ctx: Context) -> Response {
                     }
                 }
 
-            //##: UNHANDLED
+                //##: UNHANDLED
             } else {
                 println!("--Unhandled request: {:#?}", incoming_data);
                 println!("  BODY: {}", body);
@@ -2037,7 +2037,7 @@ pub fn api_block_get_live_items(key: &str, secret: &str, query: &str) -> Result<
 fn ap_build_actor_object(podcast_data: PIPodcast, actor_keys: ActorKeys) -> Result<Actor, Box<dyn Error>> {
     let podcast_guid = podcast_data.feed.id;
 
-    return Ok(Actor {
+    let mut actor = Actor {
         at_context: vec!(
             "https://www.w3.org/ns/activitystreams".to_string(),
             "https://w3id.org/security/v1".to_string(),
@@ -2058,44 +2058,7 @@ fn ap_build_actor_object(podcast_data: PIPodcast, actor_keys: ActorKeys) -> Resu
             url: format!("{}", podcast_data.feed.image).to_string(),
         }),
         summary: Some(format!("{:.96}", podcast_data.feed.description)),
-        attachment: Some(vec!(
-            Attachment {
-                name: Some("Index".to_string()),
-                r#type: "PropertyValue".to_string(),
-                value: Some(format!(
-                    "<a href='https://podcastindex.org/podcast/{}' rel='ugc'>https://podcastindex.org/podcast/{}</a>",
-                    podcast_guid,
-                    podcast_guid,
-                ).to_string()),
-            },
-            Attachment {
-                name: Some("Website".to_string()),
-                r#type: "PropertyValue".to_string(),
-                value: Some(format!(
-                    "<a href='{}' rel='ugc'>{}</a>",
-                    podcast_data.feed.link,
-                    podcast_data.feed.link,
-                ).to_string()),
-            },
-            Attachment {
-                name: Some("RSS".to_string()),
-                r#type: "PropertyValue".to_string(),
-                value: Some(format!("{}",podcast_data.feed.url).to_string()),
-            },
-            Attachment {
-                name: Some("RSS".to_string()),
-                r#type: "PropertyValue".to_string(),
-                value: Some(format!("{}",podcast_data.feed.url).to_string()),
-            },
-            Attachment {
-                name: Some("Podcast Guid".to_string()),
-                r#type: "PropertyValue".to_string(),
-                value: Some(format!(
-                    "{}",
-                    podcast_data.feed.podcastGuid,
-                ).to_string()),
-            },
-        )),
+        attachment: None,
         publicKey: PublicKey {
             id: format!("https://ap.podcastindex.org/podcasts?id={}#main-key", podcast_guid).to_string(),
             owner: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
@@ -2112,7 +2075,69 @@ fn ap_build_actor_object(podcast_data: PIPodcast, actor_keys: ActorKeys) -> Resu
         devices: None,
         //alsoKnownAs: None,
         //tag: vec!(),
-    });
+    };
+
+    //##: Attachments
+    let mut attachments = vec!(
+        Attachment {
+            name: Some("Index".to_string()),
+            r#type: "PropertyValue".to_string(),
+            value: Some(format!(
+                "<a href='https://podcastindex.org/podcast/{}' rel='ugc'>https://podcastindex.org/podcast/{}</a>",
+                podcast_guid,
+                podcast_guid,
+            ).to_string()),
+        },
+        Attachment {
+            name: Some("Website".to_string()),
+            r#type: "PropertyValue".to_string(),
+            value: Some(format!(
+                "<a href='{}' rel='ugc'>{}</a>",
+                podcast_data.feed.link,
+                podcast_data.feed.link,
+            ).to_string()),
+        },
+        Attachment {
+            name: Some("RSS".to_string()),
+            r#type: "PropertyValue".to_string(),
+            value: Some(format!(
+                "<a href='{}' rel='ugc'>{}</a>",
+                podcast_data.feed.url,
+                podcast_data.feed.url
+            ).to_string()),
+        },
+        Attachment {
+            name: Some("Podcast Guid".to_string()),
+            r#type: "PropertyValue".to_string(),
+            value: Some(format!(
+                "{}",
+                podcast_data.feed.podcastGuid,
+            ).to_string()),
+        },
+    );
+    //##: Funding tag present?
+    match podcast_data.feed.funding {
+        Some(funding) => {
+            let funding_url = funding.url.unwrap_or("".to_string());
+            let funding_message = funding.message.unwrap_or(funding_url.clone());
+
+            attachments.push(
+                Attachment {
+                    name: Some("Funding".to_string()),
+                    r#type: "PropertyValue".to_string(),
+                    value: Some(format!(
+                        "<a href='{}' rel='ugc'>{}</a>",
+                        funding_url,
+                        funding_message
+                    ).to_string()),
+                }
+            );
+        }
+        None => {}
+    }
+    actor.attachment = Some(attachments);
+
+    return Ok(actor);
 }
 
 fn ap_build_follow_accept(follow_request: InboxRequestWithObject, podcast_guid: u64) -> Result<InboxRequestAccept, Box<dyn Error>> {
