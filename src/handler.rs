@@ -409,10 +409,10 @@ pub struct PIItem {
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize)]
 pub enum PISocialInteractProtocol {
-    Activitypub,
-    Xmpp,
-    Bluesky,
-    Nostr,
+    activitypub,
+    xmpp,
+    bluesky,
+    nostr,
 }
 
 #[allow(non_snake_case)]
