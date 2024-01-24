@@ -1375,7 +1375,7 @@ pub async fn inbox(ctx: Context) -> Response {
                             statusid: parent_episode_guid,
                             objectid: incoming_data.object.id,
                             objecttype: incoming_data.object.r#type.unwrap_or("".to_string()),
-                            attributedto: incoming_data.object.attributedTo.unwrap_or("".to_string()),
+                            attributedto: incoming_data.object.attributedTo.clone().unwrap_or("".to_string()),
                             content: incoming_data.object.content.clone().unwrap(),
                             sensitive: 0,
                             published: incoming_data.object.published.unwrap_or(received_time.to_string()),
@@ -1394,7 +1394,7 @@ pub async fn inbox(ctx: Context) -> Response {
                                 statusid: reply.statusid,
                                 objectid: incoming_data.object.id,
                                 objecttype: incoming_data.object.r#type.unwrap_or("".to_string()),
-                                attributedto: incoming_data.object.attributedTo.unwrap_or("".to_string()),
+                                attributedto: incoming_data.object.attributedTo.clone().unwrap_or("".to_string()),
                                 content: incoming_data.object.content.clone().unwrap(),
                                 sensitive: 0,
                                 published: incoming_data.object.published.unwrap_or(received_time.to_string()),
@@ -1412,6 +1412,7 @@ pub async fn inbox(ctx: Context) -> Response {
                     && incoming_data.object.content.is_some()
                 {
                     for cc in incoming_data.object.cc.unwrap() {
+
                         let mut parent_pcid= 0;
                         match get_id_from_url(cc).parse::<u64>() {
                             Ok(pcid) => {
@@ -1427,17 +1428,19 @@ pub async fn inbox(ctx: Context) -> Response {
                                 let _ = api_hub_rescan(
                                     &ctx.pi_auth.key,
                                     &ctx.pi_auth.secret,
-                                    &podcast_guid,
-                                );
-                            }
-                        }
+                                    &parent_pcid.to_string().as_str(),
+                                ).await;
 
-                        if incoming_data.actor.is_some() {
-                            let _ = ap_block_send_note(
-                                parent_pcid,
-                                format!("{}/inbox", incoming_data.actor.clone().unwrap()).to_string(),
-                                "Done.".to_string()
-                            );
+                                if incoming_data.object.attributedTo.is_some() {
+                                    let _ = ap_block_send_note(
+                                        parent_pcid,
+                                        format!("{}/inbox", incoming_data.object.attributedTo.clone().unwrap()).to_string(),
+                                        "Done.".to_string()
+                                    );
+                                }
+                            }
+
+                            break;
                         }
                     }
                 }
