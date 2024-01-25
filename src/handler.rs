@@ -1238,7 +1238,7 @@ pub async fn inbox(ctx: Context) -> Response {
         "follow" => {
             println!("--Follow request");
             println!("  FROM: [{}]", incoming_data.actor.clone().unwrap());
-            match ap_get_remote_actor(incoming_data.actor.clone().unwrap()) {
+            match ap_block_get_remote_actor(incoming_data.actor.clone().unwrap()) {
                 Ok(remote_actor) => {
                     //##: Construct a response
                     println!("  Building follow accept json.");
@@ -1397,12 +1397,15 @@ pub async fn inbox(ctx: Context) -> Response {
             }
 
             //##: PI Action Requests
+            //##: We only deem the request an action if it's direct to the actor and not a reply
             if incoming_data.object.cc.is_some()
                 && incoming_data.object.inReplyTo.is_none()
                 && incoming_data.object.content.is_some()
             {
                 for cc in incoming_data.object.cc.unwrap() {
                     let mut parent_pcid = 0;
+
+                    //##: Check for a valid podcast id
                     match get_id_from_url(cc).parse::<u64>() {
                         Ok(pcid) => {
                             parent_pcid = pcid;
@@ -1411,25 +1414,39 @@ pub async fn inbox(ctx: Context) -> Response {
                             eprintln!("Failed to ascertain podcast id: [{}].\n", e);
                         }
                     }
+                    if parent_pcid <= 0 {
+                        break;
+                    }
 
-                    if parent_pcid > 0 {
-                        if incoming_data.object.content.clone().unwrap().contains("rescan") {
+                    //##: Handle the action requests
+                    match incoming_data.object.content.clone().unwrap().trim() {
+
+                        //##: Re-scan action
+                        x if x.contains("rescan") => {
+                            println!("  PI Action request: [{}|{}].", x, parent_pcid);
                             let _ = api_hub_rescan(
                                 &ctx.pi_auth.key,
                                 &ctx.pi_auth.secret,
                                 &parent_pcid.to_string().as_str(),
                             ).await;
 
-                            if incoming_data.object.attributedTo.is_some() {
+                            //##: If this request came from an actor, look them up and reply back
+                            if incoming_data.object.attributedTo.clone().is_some() {
+                                let sending_actor = ap_block_get_remote_actor(
+                                    incoming_data.object.attributedTo.clone().unwrap()
+                                );
                                 let _ = ap_block_send_note(
                                     parent_pcid,
-                                    format!("{}/inbox", incoming_data.object.attributedTo.clone().unwrap()).to_string(),
+                                    sending_actor.unwrap().inbox,
                                     "Done.".to_string(),
                                 );
                             }
                         }
 
-                        break;
+                        //##: Unhandled action
+                        _ => {
+                            println!("  Unsupported PI action request : [|{}]", parent_pcid);
+                        }
                     }
                 }
             }
@@ -2860,7 +2877,7 @@ pub fn ap_block_send_live_note(podcast_guid: u64, episode: &PILiveItem, inbox_ur
     }
 }
 
-pub fn ap_get_remote_actor(actor_url: String) -> Result<Actor, Box<dyn Error>> {
+pub fn ap_block_get_remote_actor(actor_url: String) -> Result<Actor, Box<dyn Error>> {
     println!("  AP Get Remote Actor: {}", actor_url);
 
     //##: Build the query with the required headers
