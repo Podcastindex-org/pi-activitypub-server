@@ -1229,7 +1229,6 @@ pub async fn inbox(ctx: Context) -> Response {
 
     //##: Handle the request based on its type
     match incoming_data.r#type.to_lowercase().as_str() {
-
         "delete" => {
             println!("--Delete request: {:#?}", incoming_data);
             println!("  BODY: {}", body);
@@ -1444,7 +1443,55 @@ pub async fn inbox(ctx: Context) -> Response {
                                         println!("  Can't get actor from action request: [{:#?}|\n{}]", e, parent_pcid);
                                     }
                                 }
+                            }
+                        }
 
+                        //##: Send me the latest episode
+                        x if x.contains("latest") => {
+                            //##: If this request came from an actor, look them up and reply back
+                            if incoming_data.object.attributedTo.clone().is_some() {
+                                match ap_block_get_remote_actor(incoming_data.object.attributedTo.clone().unwrap()) {
+                                    Ok(sending_actor) => {
+                                        match api_block_get_episodes(
+                                            &ctx.pi_auth.key,
+                                            &ctx.pi_auth.secret,
+                                            &parent_pcid.to_string().as_str(),
+                                        ) {
+                                            Ok(response_body) => {
+                                                match serde_json::from_str(response_body.as_str()) {
+                                                    Ok(data) => {
+                                                        let podcast_data: PIEpisodes = data;
+                                                        //##: TODO Get this code out of this deep level of nesting
+                                                        let latest_episode = podcast_data.items.get(0);
+                                                        if latest_episode.is_some() {
+                                                            let latest_episode_details = latest_episode.unwrap();
+
+                                                            let _ = ap_block_send_episode_note(
+                                                                parent_pcid,
+                                                                latest_episode_details,
+                                                                sending_actor.inbox,
+                                                            );
+                                                        }
+                                                    }
+                                                    Err(e) => {
+                                                        //##: TODO - refactor this deep nesting
+                                                        eprintln!("  API response prep error: [{:#?}] actor guid: [{}].\n",
+                                                                  e,
+                                                                  parent_pcid.to_string().as_str()
+                                                        );
+                                                    }
+                                                }
+                                            }
+                                            Err(e) => {
+                                                //##: TODO - refactor this deep nesting
+                                                eprintln!("  PI API call error: [{:#?}].\n", e);
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        println!("  Can't get actor from action request: [{:#?}|\n{}]", e, parent_pcid);
+                                    }
+                                }
                             }
                         }
 
