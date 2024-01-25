@@ -1224,106 +1224,85 @@ pub async fn inbox(ctx: Context) -> Response {
                 //##: FOLLOW
             } else if incoming_data.r#type.to_lowercase() == "follow" {
                 println!("--Follow request");
-                let client = reqwest::Client::new();
-                let response = client
-                    .get(&incoming_data.actor.clone().unwrap())
-                    .header(reqwest::header::USER_AGENT, "Podcast Index AP/v0.1.2a")
-                    .header(reqwest::header::ACCEPT, "application/activity+json")
-                    .send()
-                    .await;
+
                 println!("  FROM: [{}]", incoming_data.actor.clone().unwrap());
-                match response {
-                    Ok(response) => {
-                        match response.text().await {
-                            Ok(response_text) => {
-                                println!("  ACTOR BODY: [{:#?}]", response_text.clone().as_str());
-                                let actor_data = serde_json::from_str::<Actor>(response_text.as_str()).unwrap();
-                                println!("  ACTOR LOOKUP: [{:#?}]", actor_data);
-
-                                //Construct a response
-                                println!("  Building follow accept json.");
-                                let accept_data;
-                                match ap_build_follow_accept(incoming_data, podcast_guid.parse::<u64>().unwrap()) {
-                                    Ok(data) => {
-                                        accept_data = data;
-                                    }
-                                    Err(e) => {
-                                        eprintln!("Build follow accept error: [{:#?}].\n", e);
-                                        return hyper::Response::builder()
-                                            .status(StatusCode::from_u16(500).unwrap())
-                                            .body(format!("Accept build error.").into())
-                                            .unwrap();
-                                    }
-                                }
-                                let _accept_json;
-                                match serde_json::to_string_pretty(&accept_data) {
-                                    Ok(json_result) => {
-                                        _accept_json = json_result;
-                                    }
-                                    Err(e) => {
-                                        eprintln!("Response prep error: [{:#?}].\n", e);
-                                        return hyper::Response::builder()
-                                            .status(StatusCode::from_u16(500).unwrap())
-                                            .body(format!("Accept encode error.").into())
-                                            .unwrap();
-                                    }
-                                }
-
-                                //##: Send the accept request to the follower inbox url
-                                println!("  Send the follow accept request.");
-                                match ap_send_follow_accept(
-                                    podcast_guid.parse::<u64>().unwrap(),
-                                    accept_data,
-                                    actor_data.inbox.clone(),
-                                ).await {
-                                    Ok(_) => {
-                                        let instance_fqdn = get_host_from_url(actor_data.inbox.clone());
-                                        let shared_inbox;
-                                        match actor_data.endpoints {
-                                            Some(endpoints) => {
-                                                shared_inbox = endpoints.sharedInbox.clone();
-                                            }
-                                            None => {
-                                                shared_inbox = actor_data.inbox.clone();
-                                            }
-                                        }
-                                        match dbif::add_follower_to_db(&AP_DATABASE_FILE.to_string(), FollowerRecord {
-                                            pcid: podcast_guid.parse::<u64>().unwrap(),
-                                            actor: actor_data.id.clone(),
-                                            instance: instance_fqdn,
-                                            inbox: actor_data.inbox,
-                                            shared_inbox: shared_inbox,
-                                            status: "active".to_string(),
-                                        }) {
-                                            Ok(_) => {
-                                                println!("Saved follow: [{}|{}]", podcast_guid, actor_data.id);
-                                            }
-                                            Err(e) => {
-                                                eprintln!("Unable to save follow state: [{}].\n", e);
-                                                return hyper::Response::builder()
-                                                    .status(StatusCode::from_u16(400).unwrap())
-                                                    .body(format!("Unable to save follow state.").into())
-                                                    .unwrap();
-                                            }
-                                        }
-                                    }
-                                    Err(e) => {
-                                        eprintln!("Acknowledging failed: [{}].\n", e);
-                                        return hyper::Response::builder()
-                                            .status(StatusCode::from_u16(400).unwrap())
-                                            .body(format!("Acknowledging failed.").into())
-                                            .unwrap();
-                                    }
-                                };
+                match ap_get_remote_actor(incoming_data.actor.clone().unwrap()) {
+                    Ok(remote_actor) => {
+                        //##: Construct a response
+                        println!("  Building follow accept json.");
+                        let accept_data;
+                        match ap_build_follow_accept(incoming_data, podcast_guid.parse::<u64>().unwrap()) {
+                            Ok(data) => {
+                                accept_data = data;
                             }
                             Err(e) => {
-                                eprintln!("Bad actor: [{}].\n", e);
+                                eprintln!("Build follow accept error: [{:#?}].\n", e);
                                 return hyper::Response::builder()
-                                    .status(StatusCode::from_u16(400).unwrap())
-                                    .body(format!("Bad actor.").into())
+                                    .status(StatusCode::from_u16(500).unwrap())
+                                    .body(format!("Accept build error.").into())
                                     .unwrap();
                             }
                         }
+                        let _accept_json;
+                        match serde_json::to_string_pretty(&accept_data) {
+                            Ok(json_result) => {
+                                _accept_json = json_result;
+                            }
+                            Err(e) => {
+                                eprintln!("Response prep error: [{:#?}].\n", e);
+                                return hyper::Response::builder()
+                                    .status(StatusCode::from_u16(500).unwrap())
+                                    .body(format!("Accept encode error.").into())
+                                    .unwrap();
+                            }
+                        }
+
+                        //##: Send the accept request to the follower inbox url
+                        println!("  Send the follow accept request.");
+                        match ap_send_follow_accept(
+                            podcast_guid.parse::<u64>().unwrap(),
+                            accept_data,
+                            remote_actor.inbox.clone(),
+                        ) {
+                            Ok(_) => {
+                                let instance_fqdn = get_host_from_url(remote_actor.inbox.clone());
+                                let shared_inbox;
+                                match remote_actor.endpoints {
+                                    Some(endpoints) => {
+                                        shared_inbox = endpoints.sharedInbox.clone();
+                                    }
+                                    None => {
+                                        shared_inbox = remote_actor.inbox.clone();
+                                    }
+                                }
+                                match dbif::add_follower_to_db(&AP_DATABASE_FILE.to_string(), FollowerRecord {
+                                    pcid: podcast_guid.parse::<u64>().unwrap(),
+                                    actor: remote_actor.id.clone(),
+                                    instance: instance_fqdn,
+                                    inbox: remote_actor.inbox,
+                                    shared_inbox: shared_inbox,
+                                    status: "active".to_string(),
+                                }) {
+                                    Ok(_) => {
+                                        println!("Saved follow: [{}|{}]", podcast_guid, remote_actor.id);
+                                    }
+                                    Err(e) => {
+                                        eprintln!("Unable to save follow state: [{}].\n", e);
+                                        return hyper::Response::builder()
+                                            .status(StatusCode::from_u16(400).unwrap())
+                                            .body(format!("Unable to save follow state.").into())
+                                            .unwrap();
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("Acknowledging failed: [{}].\n", e);
+                                return hyper::Response::builder()
+                                    .status(StatusCode::from_u16(400).unwrap())
+                                    .body(format!("Acknowledging failed.").into())
+                                    .unwrap();
+                            }
+                        };
                     }
                     Err(e) => {
                         eprintln!("Bad actor: [{}].\n", e);
@@ -1412,8 +1391,7 @@ pub async fn inbox(ctx: Context) -> Response {
                     && incoming_data.object.content.is_some()
                 {
                     for cc in incoming_data.object.cc.unwrap() {
-
-                        let mut parent_pcid= 0;
+                        let mut parent_pcid = 0;
                         match get_id_from_url(cc).parse::<u64>() {
                             Ok(pcid) => {
                                 parent_pcid = pcid;
@@ -1435,7 +1413,7 @@ pub async fn inbox(ctx: Context) -> Response {
                                     let _ = ap_block_send_note(
                                         parent_pcid,
                                         format!("{}/inbox", incoming_data.object.attributedTo.clone().unwrap()).to_string(),
-                                        "Done.".to_string()
+                                        "Done.".to_string(),
                                     );
                                 }
                             }
@@ -2312,7 +2290,7 @@ fn ap_get_actor_keys(podcast_guid: u64) -> Result<ActorKeys, Box<dyn Error>> {
     return Ok(actor_keys);
 }
 
-pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequestAccept, inbox_url: String) -> Result<String, Box<dyn Error>> {
+pub fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequestAccept, inbox_url: String) -> Result<String, Box<dyn Error>> {
     println!("  AP Accepting Follow request from: {}", inbox_accept.object.actor);
 
     //##: Get actor keys for guid
@@ -2370,24 +2348,24 @@ pub async fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequest
     headers.insert("host", header::HeaderValue::from_str(&http_signature_headers.host).unwrap());
     headers.insert("digest", header::HeaderValue::from_str(&http_signature_headers.digest.unwrap()).unwrap());
     headers.insert("signature", header::HeaderValue::from_str(&http_signature_headers.signature).unwrap());
-    let client = reqwest::Client::builder()
+    let client = reqwest::blocking::Client::builder()
         .default_headers(headers)
         .build()
         .unwrap();
 
     //##: Send the Accept request
     println!("  ACCEPT SENT: [{}]", inbox_url.as_str());
-    let res = client
+    match client
         .post(inbox_url.as_str())
         .body(post_body)
-        .send();
-    match res.await {
+        .send()
+    {
         Ok(res) => {
             println!("  Response: [{:#?}]", res);
             if res.status() >= StatusCode::from_u16(200)? && res.status() <= StatusCode::from_u16(299)? {
                 return Ok("".to_string());
             } else {
-                let res_body = res.text().await?;
+                let res_body = res.text().unwrap();
                 eprintln!("  Body: [{:#?}]", res_body);
                 return Err(Box::new(HydraError(format!("Accepting the follow request failed.").into())));
             }
@@ -2878,6 +2856,49 @@ pub fn ap_block_send_live_note(podcast_guid: u64, episode: &PILiveItem, inbox_ur
         Err(e) => {
             eprintln!("  Error: [{}]", e);
             return Err(Box::new(HydraError(format!("Error sending episode create note request: [{}]", e).into())));
+        }
+    }
+}
+
+pub fn ap_get_remote_actor(actor_url: String) -> Result<Actor, Box<dyn Error>> {
+    println!("  AP Get Remote Actor: {}", actor_url);
+
+    //##: Build the query with the required headers
+    let mut headers = header::HeaderMap::new();
+    headers.insert("User-Agent", header::HeaderValue::from_static("Podcast Index AP/v0.1.2a"));
+    headers.insert("Accept", header::HeaderValue::from_static("application/activity+json"));
+    let client = reqwest::blocking::Client::builder()
+        .default_headers(headers)
+        .build()
+        .unwrap();
+
+    //##: Send the Accept request
+    println!("  ACTOR REQUEST SENT: [{}]", actor_url.as_str());
+    let res = client
+        .get(actor_url.as_str())
+        .send();
+    match res {
+        Ok(response) => {
+            println!("  Response: [{:#?}]", response);
+            if response.status() >= StatusCode::from_u16(200)? && response.status() <= StatusCode::from_u16(299)? {
+                match serde_json::from_str::<Actor>(response.text().unwrap().as_str()) {
+                    Ok(actor_data) => {
+                        return Ok(actor_data);
+                    }
+                    Err(e) => {
+                        eprintln!("Could not parse incoming request: [{}].\n", e);
+                        return Err(Box::new(HydraError(format!("Error parsing remote actor data: [{}]", e).into())));
+                    }
+                }
+            } else {
+                let res_body = response.text().unwrap();
+                eprintln!("  Actor Body: [{:#?}]", res_body);
+                return Err(Box::new(HydraError(format!("Getting remote actor failed.").into())));
+            }
+        }
+        Err(e) => {
+            eprintln!("  Error: [{}]", e);
+            return Err(Box::new(HydraError(format!("Error getting remote actor: [{}]", e).into())));
         }
     }
 }
