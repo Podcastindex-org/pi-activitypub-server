@@ -1210,224 +1210,12 @@ pub async fn inbox(ctx: Context) -> Response {
     let body_bytes = hyper::body::to_bytes(body).await.unwrap();
     let body = std::str::from_utf8(&body_bytes).unwrap();
 
-    let inbox_request = serde_json::from_str::<InboxRequestWithObject>(body);
-    match inbox_request {
-        Ok(incoming_data) => {
-            //TODO: This should all be in separate functions
-
-            //##: DELETE
-            if incoming_data.r#type.to_lowercase() == "delete" {
-                //TODO: Ignoring this for now
-                println!("--Delete request: {:#?}", incoming_data);
-                println!("  BODY: {}", body);
-
-                //##: FOLLOW
-            } else if incoming_data.r#type.to_lowercase() == "follow" {
-                println!("--Follow request");
-
-                println!("  FROM: [{}]", incoming_data.actor.clone().unwrap());
-                match ap_get_remote_actor(incoming_data.actor.clone().unwrap()) {
-                    Ok(remote_actor) => {
-                        //##: Construct a response
-                        println!("  Building follow accept json.");
-                        let accept_data;
-                        match ap_build_follow_accept(incoming_data, podcast_guid.parse::<u64>().unwrap()) {
-                            Ok(data) => {
-                                accept_data = data;
-                            }
-                            Err(e) => {
-                                eprintln!("Build follow accept error: [{:#?}].\n", e);
-                                return hyper::Response::builder()
-                                    .status(StatusCode::from_u16(500).unwrap())
-                                    .body(format!("Accept build error.").into())
-                                    .unwrap();
-                            }
-                        }
-                        let _accept_json;
-                        match serde_json::to_string_pretty(&accept_data) {
-                            Ok(json_result) => {
-                                _accept_json = json_result;
-                            }
-                            Err(e) => {
-                                eprintln!("Response prep error: [{:#?}].\n", e);
-                                return hyper::Response::builder()
-                                    .status(StatusCode::from_u16(500).unwrap())
-                                    .body(format!("Accept encode error.").into())
-                                    .unwrap();
-                            }
-                        }
-
-                        //##: Send the accept request to the follower inbox url
-                        println!("  Send the follow accept request.");
-                        match ap_send_follow_accept(
-                            podcast_guid.parse::<u64>().unwrap(),
-                            accept_data,
-                            remote_actor.inbox.clone(),
-                        ) {
-                            Ok(_) => {
-                                let instance_fqdn = get_host_from_url(remote_actor.inbox.clone());
-                                let shared_inbox;
-                                match remote_actor.endpoints {
-                                    Some(endpoints) => {
-                                        shared_inbox = endpoints.sharedInbox.clone();
-                                    }
-                                    None => {
-                                        shared_inbox = remote_actor.inbox.clone();
-                                    }
-                                }
-                                match dbif::add_follower_to_db(&AP_DATABASE_FILE.to_string(), FollowerRecord {
-                                    pcid: podcast_guid.parse::<u64>().unwrap(),
-                                    actor: remote_actor.id.clone(),
-                                    instance: instance_fqdn,
-                                    inbox: remote_actor.inbox,
-                                    shared_inbox: shared_inbox,
-                                    status: "active".to_string(),
-                                }) {
-                                    Ok(_) => {
-                                        println!("Saved follow: [{}|{}]", podcast_guid, remote_actor.id);
-                                    }
-                                    Err(e) => {
-                                        eprintln!("Unable to save follow state: [{}].\n", e);
-                                        return hyper::Response::builder()
-                                            .status(StatusCode::from_u16(400).unwrap())
-                                            .body(format!("Unable to save follow state.").into())
-                                            .unwrap();
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                eprintln!("Acknowledging failed: [{}].\n", e);
-                                return hyper::Response::builder()
-                                    .status(StatusCode::from_u16(400).unwrap())
-                                    .body(format!("Acknowledging failed.").into())
-                                    .unwrap();
-                            }
-                        };
-                    }
-                    Err(e) => {
-                        eprintln!("Bad actor: [{}].\n", e);
-                        return hyper::Response::builder()
-                            .status(StatusCode::from_u16(400).unwrap())
-                            .body(format!("Bad actor.").into())
-                            .unwrap();
-                    }
-                }
-
-                //##: UNDO
-            } else if incoming_data.r#type.to_lowercase() == "undo" {
-                //##: Un-follow
-                println!("--Unfollow request");
-                if incoming_data.object.r#type.is_some()
-                    && incoming_data.object.r#type.as_ref().unwrap().to_lowercase() == "follow"
-                {
-                    let _ = dbif::remove_follower_from_db(&AP_DATABASE_FILE.to_string(), FollowerRecord {
-                        pcid: podcast_guid.parse::<u64>().unwrap(),
-                        actor: incoming_data.actor.unwrap(),
-                        instance: "".to_string(),
-                        inbox: "".to_string(),
-                        shared_inbox: "".to_string(),
-                        status: "".to_string(),
-                    });
-                }
-
-                //: CREATE
-            } else if incoming_data.r#type.to_lowercase() == "create" {
-                //##: Create
-                println!("--Create request: {:#?}", incoming_data);
-                println!("  BODY: {}", body);
-
-                //##: Replies
-                //##: Parse out the inReplyTo so we can determine which podcast this belongs to
-                if incoming_data.object.inReplyTo.is_some()
-                    && incoming_data.object.content.is_some()
-                {
-                    let in_reply_to_url = incoming_data.object.inReplyTo.clone().unwrap();
-                    let parent_pcid = get_id_from_url(in_reply_to_url.clone());
-                    let parent_episode_guid = get_statusid_from_url(in_reply_to_url.clone());
-                    let received_time = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time mismatch.").as_secs();
-                    let reply_conversation = incoming_data.object.conversation.unwrap_or("".to_string());
-
-                    if parent_pcid != "" && parent_episode_guid != ""
-                    {
-                        let _ = dbif::add_reply_to_db(&AP_DATABASE_FILE.to_string(), ReplyRecord {
-                            pcid: parent_pcid.parse::<u64>().unwrap(),
-                            statusid: parent_episode_guid,
-                            objectid: incoming_data.object.id,
-                            objecttype: incoming_data.object.r#type.unwrap_or("".to_string()),
-                            attributedto: incoming_data.object.attributedTo.clone().unwrap_or("".to_string()),
-                            content: incoming_data.object.content.clone().unwrap(),
-                            sensitive: 0,
-                            published: incoming_data.object.published.unwrap_or(received_time.to_string()),
-                            received: received_time,
-                            conversation: reply_conversation.clone(),
-                        });
-                    } else {
-                        let replies = dbif::get_a_reply_by_conversation(
-                            &AP_DATABASE_FILE.to_string(),
-                            reply_conversation.clone(),
-                        );
-
-                        for reply in replies.unwrap() {
-                            let _ = dbif::add_reply_to_db(&AP_DATABASE_FILE.to_string(), ReplyRecord {
-                                pcid: reply.pcid,
-                                statusid: reply.statusid,
-                                objectid: incoming_data.object.id,
-                                objecttype: incoming_data.object.r#type.unwrap_or("".to_string()),
-                                attributedto: incoming_data.object.attributedTo.clone().unwrap_or("".to_string()),
-                                content: incoming_data.object.content.clone().unwrap(),
-                                sensitive: 0,
-                                published: incoming_data.object.published.unwrap_or(received_time.to_string()),
-                                received: received_time,
-                                conversation: reply_conversation.clone(),
-                            });
-                            break;
-                        }
-                    }
-                }
-
-                //##: PI Action Requests
-                if incoming_data.object.cc.is_some()
-                    && incoming_data.object.inReplyTo.is_none()
-                    && incoming_data.object.content.is_some()
-                {
-                    for cc in incoming_data.object.cc.unwrap() {
-                        let mut parent_pcid = 0;
-                        match get_id_from_url(cc).parse::<u64>() {
-                            Ok(pcid) => {
-                                parent_pcid = pcid;
-                            }
-                            Err(e) => {
-                                eprintln!("Failed to ascertain podcast id: [{}].\n", e);
-                            }
-                        }
-
-                        if parent_pcid > 0 {
-                            if incoming_data.object.content.clone().unwrap().contains("rescan") {
-                                let _ = api_hub_rescan(
-                                    &ctx.pi_auth.key,
-                                    &ctx.pi_auth.secret,
-                                    &parent_pcid.to_string().as_str(),
-                                ).await;
-
-                                if incoming_data.object.attributedTo.is_some() {
-                                    let _ = ap_block_send_note(
-                                        parent_pcid,
-                                        format!("{}/inbox", incoming_data.object.attributedTo.clone().unwrap()).to_string(),
-                                        "Done.".to_string(),
-                                    );
-                                }
-                            }
-
-                            break;
-                        }
-                    }
-                }
-
-                //##: UNHANDLED
-            } else {
-                println!("--Unhandled request: {:#?}", incoming_data);
-                println!("  BODY: {}", body);
-            }
+    //##: Decode the inbox request JSON
+    let incoming_data;
+    match serde_json::from_str::<InboxRequestWithObject>(body) {
+        Ok(decoded_inbox_request) => {
+            //TODO: validate the key signature before accepting request
+            incoming_data = decoded_inbox_request;
         }
         Err(e) => {
             eprintln!("Could not parse incoming request: [{}].\n", e);
@@ -1439,7 +1227,219 @@ pub async fn inbox(ctx: Context) -> Response {
         }
     }
 
-    //TODO: validate the key signature before accepting request
+    //##: Handle the request based on its type
+    match incoming_data.r#type.to_lowercase().as_str() {
+
+        "delete" => {
+            println!("--Delete request: {:#?}", incoming_data);
+            println!("  BODY: {}", body);
+        }
+
+        "follow" => {
+            println!("--Follow request");
+            println!("  FROM: [{}]", incoming_data.actor.clone().unwrap());
+            match ap_get_remote_actor(incoming_data.actor.clone().unwrap()) {
+                Ok(remote_actor) => {
+                    //##: Construct a response
+                    println!("  Building follow accept json.");
+                    let accept_data;
+                    match ap_build_follow_accept(incoming_data, podcast_guid.parse::<u64>().unwrap()) {
+                        Ok(data) => {
+                            accept_data = data;
+                        }
+                        Err(e) => {
+                            eprintln!("Build follow accept error: [{:#?}].\n", e);
+                            return hyper::Response::builder()
+                                .status(StatusCode::from_u16(500).unwrap())
+                                .body(format!("Accept build error.").into())
+                                .unwrap();
+                        }
+                    }
+                    let _accept_json;
+                    match serde_json::to_string_pretty(&accept_data) {
+                        Ok(json_result) => {
+                            _accept_json = json_result;
+                        }
+                        Err(e) => {
+                            eprintln!("Response prep error: [{:#?}].\n", e);
+                            return hyper::Response::builder()
+                                .status(StatusCode::from_u16(500).unwrap())
+                                .body(format!("Accept encode error.").into())
+                                .unwrap();
+                        }
+                    }
+
+                    //##: Send the accept request to the follower inbox url
+                    println!("  Send the follow accept request.");
+                    match ap_send_follow_accept(
+                        podcast_guid.parse::<u64>().unwrap(),
+                        accept_data,
+                        remote_actor.inbox.clone(),
+                    ) {
+                        Ok(_) => {
+                            let instance_fqdn = get_host_from_url(remote_actor.inbox.clone());
+                            let shared_inbox;
+                            match remote_actor.endpoints {
+                                Some(endpoints) => {
+                                    shared_inbox = endpoints.sharedInbox.clone();
+                                }
+                                None => {
+                                    shared_inbox = remote_actor.inbox.clone();
+                                }
+                            }
+                            match dbif::add_follower_to_db(&AP_DATABASE_FILE.to_string(), FollowerRecord {
+                                pcid: podcast_guid.parse::<u64>().unwrap(),
+                                actor: remote_actor.id.clone(),
+                                instance: instance_fqdn,
+                                inbox: remote_actor.inbox,
+                                shared_inbox: shared_inbox,
+                                status: "active".to_string(),
+                            }) {
+                                Ok(_) => {
+                                    println!("Saved follow: [{}|{}]", podcast_guid, remote_actor.id);
+                                }
+                                Err(e) => {
+                                    eprintln!("Unable to save follow state: [{}].\n", e);
+                                    return hyper::Response::builder()
+                                        .status(StatusCode::from_u16(400).unwrap())
+                                        .body(format!("Unable to save follow state.").into())
+                                        .unwrap();
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Acknowledging failed: [{}].\n", e);
+                            return hyper::Response::builder()
+                                .status(StatusCode::from_u16(400).unwrap())
+                                .body(format!("Acknowledging failed.").into())
+                                .unwrap();
+                        }
+                    };
+                }
+                Err(e) => {
+                    eprintln!("Bad actor: [{}].\n", e);
+                    return hyper::Response::builder()
+                        .status(StatusCode::from_u16(400).unwrap())
+                        .body(format!("Bad actor.").into())
+                        .unwrap();
+                }
+            }
+        }
+
+        "undo" => {
+            println!("--Unfollow request");
+            if incoming_data.object.r#type.is_some()
+                && incoming_data.object.r#type.as_ref().unwrap().to_lowercase() == "follow"
+            {
+                let _ = dbif::remove_follower_from_db(&AP_DATABASE_FILE.to_string(), FollowerRecord {
+                    pcid: podcast_guid.parse::<u64>().unwrap(),
+                    actor: incoming_data.actor.unwrap(),
+                    instance: "".to_string(),
+                    inbox: "".to_string(),
+                    shared_inbox: "".to_string(),
+                    status: "".to_string(),
+                });
+            }
+        }
+
+        "create" => {
+            //##: Create
+            println!("--Create request: {:#?}", incoming_data);
+            println!("  BODY: {}", body);
+
+            //##: Replies
+            //##: Parse out the inReplyTo so we can determine which podcast this belongs to
+            if incoming_data.object.inReplyTo.is_some()
+                && incoming_data.object.content.is_some()
+            {
+                let in_reply_to_url = incoming_data.object.inReplyTo.clone().unwrap();
+                let parent_pcid = get_id_from_url(in_reply_to_url.clone());
+                let parent_episode_guid = get_statusid_from_url(in_reply_to_url.clone());
+                let received_time = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time mismatch.").as_secs();
+                let reply_conversation = incoming_data.object.conversation.unwrap_or("".to_string());
+
+                if parent_pcid != "" && parent_episode_guid != ""
+                {
+                    let _ = dbif::add_reply_to_db(&AP_DATABASE_FILE.to_string(), ReplyRecord {
+                        pcid: parent_pcid.parse::<u64>().unwrap(),
+                        statusid: parent_episode_guid,
+                        objectid: incoming_data.object.id,
+                        objecttype: incoming_data.object.r#type.unwrap_or("".to_string()),
+                        attributedto: incoming_data.object.attributedTo.clone().unwrap_or("".to_string()),
+                        content: incoming_data.object.content.clone().unwrap(),
+                        sensitive: 0,
+                        published: incoming_data.object.published.unwrap_or(received_time.to_string()),
+                        received: received_time,
+                        conversation: reply_conversation.clone(),
+                    });
+                } else {
+                    let replies = dbif::get_a_reply_by_conversation(
+                        &AP_DATABASE_FILE.to_string(),
+                        reply_conversation.clone(),
+                    );
+
+                    for reply in replies.unwrap() {
+                        let _ = dbif::add_reply_to_db(&AP_DATABASE_FILE.to_string(), ReplyRecord {
+                            pcid: reply.pcid,
+                            statusid: reply.statusid,
+                            objectid: incoming_data.object.id,
+                            objecttype: incoming_data.object.r#type.unwrap_or("".to_string()),
+                            attributedto: incoming_data.object.attributedTo.clone().unwrap_or("".to_string()),
+                            content: incoming_data.object.content.clone().unwrap(),
+                            sensitive: 0,
+                            published: incoming_data.object.published.unwrap_or(received_time.to_string()),
+                            received: received_time,
+                            conversation: reply_conversation.clone(),
+                        });
+                        break;
+                    }
+                }
+            }
+
+            //##: PI Action Requests
+            if incoming_data.object.cc.is_some()
+                && incoming_data.object.inReplyTo.is_none()
+                && incoming_data.object.content.is_some()
+            {
+                for cc in incoming_data.object.cc.unwrap() {
+                    let mut parent_pcid = 0;
+                    match get_id_from_url(cc).parse::<u64>() {
+                        Ok(pcid) => {
+                            parent_pcid = pcid;
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to ascertain podcast id: [{}].\n", e);
+                        }
+                    }
+
+                    if parent_pcid > 0 {
+                        if incoming_data.object.content.clone().unwrap().contains("rescan") {
+                            let _ = api_hub_rescan(
+                                &ctx.pi_auth.key,
+                                &ctx.pi_auth.secret,
+                                &parent_pcid.to_string().as_str(),
+                            ).await;
+
+                            if incoming_data.object.attributedTo.is_some() {
+                                let _ = ap_block_send_note(
+                                    parent_pcid,
+                                    format!("{}/inbox", incoming_data.object.attributedTo.clone().unwrap()).to_string(),
+                                    "Done.".to_string(),
+                                );
+                            }
+                        }
+
+                        break;
+                    }
+                }
+            }
+        }
+
+        _ => {
+            println!("--Unhandled request: {:#?}", incoming_data);
+            println!("  BODY: {}", body);
+        }
+    }
 
     return hyper::Response::builder()
         .status(StatusCode::OK)
