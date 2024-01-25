@@ -2575,7 +2575,7 @@ pub fn ap_block_send_note(podcast_guid: u64, inbox_url: String, note: String) ->
     }
 }
 
-pub fn ap_block_send_episode_note(podcast_guid: u64, episode: &PIItem, inbox_url: String, now: bool) -> Result<String, Box<dyn Error>> {
+pub fn ap_block_send_episode_note(podcast_guid: u64, episode: &PIItem, inbox_url: String, requested: bool) -> Result<String, Box<dyn Error>> {
     println!("  AP Sending create episode note from actor: {}", podcast_guid);
 
     //##: Get actor keys for guid
@@ -2613,12 +2613,14 @@ pub fn ap_block_send_episode_note(podcast_guid: u64, episode: &PIItem, inbox_url
             episode.image.clone()
         }
     };
+    let mut intro_text = "New Episode".to_string();
     let mut timestamp_param = "".to_string();
-    if now {
+    if requested {
         timestamp_param = format!(
             "&ts={}",
             SystemTime::now().duration_since(UNIX_EPOCH).expect("Time mismatch.").as_secs()
         );
+        intro_text = "Latest Episode".to_string();
     }
     let create_action_object = Create {
         at_context: "https://www.w3.org/ns/activitystreams".to_string(),
@@ -2664,7 +2666,7 @@ pub fn ap_block_send_episode_note(podcast_guid: u64, episode: &PIItem, inbox_url
                 episode.guid
             ).to_string(),
             content: format!(
-                "<p>New Episode: <a href=\"https://podcastindex.org/podcast/{}?episode={}\">{:.256}</a></p>\
+                "<p>{}: <a href=\"https://podcastindex.org/podcast/{}?episode={}\">{:.256}</a></p>\
                  <p>Shownotes:<br>{:.256}</p>\
                  <p>\
                    <a href=\"https://antennapod.org/deeplink/subscribe?url={}\">AntennaPod</a><br>\
@@ -2682,8 +2684,9 @@ pub fn ap_block_send_episode_note(podcast_guid: u64, episode: &PIItem, inbox_url
                    <a href=\"https://truefans.fm/{}\">Truefans</a>\
                  </p>\
                  <p>Or <a href=\"{}\">Listen</a> right here.</p>\
-                 {}\
+                 <p><a href=\"{}\">Comments Thread</a></p>
                 ",
+                intro_text,
                 episode.feedId,
                 episode.id,
                 episode.title,
