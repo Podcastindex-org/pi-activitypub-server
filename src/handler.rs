@@ -1432,20 +1432,25 @@ pub async fn inbox(ctx: Context) -> Response {
 
                             //##: If this request came from an actor, look them up and reply back
                             if incoming_data.object.attributedTo.clone().is_some() {
-                                let sending_actor = ap_block_get_remote_actor(
-                                    incoming_data.object.attributedTo.clone().unwrap()
-                                );
-                                let _ = ap_block_send_note(
-                                    parent_pcid,
-                                    sending_actor.unwrap().inbox,
-                                    "Done.".to_string(),
-                                );
+                                match ap_block_get_remote_actor(incoming_data.object.attributedTo.clone().unwrap()) {
+                                    Ok(sending_actor) => {
+                                        let _ = ap_block_send_note(
+                                            parent_pcid,
+                                            sending_actor.inbox,
+                                            "Done.".to_string(),
+                                        );
+                                    }
+                                    Err(e) => {
+                                        println!("  Can't get actor from action request: [{:#?}|\n{}]", e, parent_pcid);
+                                    }
+                                }
+
                             }
                         }
 
                         //##: Unhandled action
                         _ => {
-                            println!("  Unsupported PI action request : [|{}]", parent_pcid);
+                            println!("  Unsupported PI action request: [|{}]", parent_pcid);
                         }
                     }
                 }
