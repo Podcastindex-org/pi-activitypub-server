@@ -2593,16 +2593,20 @@ pub fn ap_block_send_episode_note(podcast_guid: u64, episode: &PIItem, inbox_url
     }
 
     //##: Construct the episode note object to send
-    let mut episode_social_interact_uri = "".to_string();
+    let mut episode_social_interact_display = "".to_string();
     match &episode.socialInteract {
         Some(social_interacts) => {
             for social_interact in social_interacts {
-                episode_social_interact_uri = social_interact.uri.clone().unwrap_or("".to_string());
+                let episode_social_interact_uri = social_interact.uri.clone().unwrap_or("".to_string());
+                episode_social_interact_display = format!(
+                    "<p><a href=\"{}\">Comments Thread</a></p>",
+                    episode_social_interact_uri
+                );
                 break;
             }
         }
         None => {
-            episode_social_interact_uri = "".to_string();
+            episode_social_interact_display = "".to_string();
         }
     }
     let episode_image = match episode.image.as_str() {
@@ -2668,29 +2672,30 @@ pub fn ap_block_send_episode_note(podcast_guid: u64, episode: &PIItem, inbox_url
             content: format!(
                 "<p>{}: <a href=\"https://podcastindex.org/podcast/{}?episode={}\">{:.256}</a></p>\
                  <p>Shownotes:<br>{:.256}</p>\
+                 {}\
                  <p>\
-                   <a href=\"https://antennapod.org/deeplink/subscribe?url={}\">AntennaPod</a><br>\
-                   <a href=\"https://anytimeplayer.app/subscribe?url={}\">Anytime Player</a><br>\
-                   <a href=\"https://castamatic.com/guid/{}\">Castamatic</a><br>\
-                   <a href=\"https://curiocaster.com/podcast/pi{}\">CurioCaster</a><br>\
-                   <a href=\"https://fountain.fm/show/{}\">Fountain</a><br>\
-                   <a href=\"https://gpodder.net/subscribe?url={}\">gPodder</a><br>\
-                   <a href=\"https://overcast.fm/itunes{}\">Overcast</a><br>\
-                   <a href=\"https://pcasts.in/feed/{}\">Pocket Casts</a><br>\
-                   <a href=\"https://podcastaddict.com/feed/{}\">Podcast Addict</a><br>\
-                   <a href=\"https://app.podcastguru.io/podcast/{}\">Podcast Guru</a><br>\
-                   <a href=\"https://podnews.net/podcast/pi{}\">Podnews</a><br>\
-                   <a href=\"https://api.podverse.fm/api/v1/podcast/podcastindex/{}\">Podverse</a><br>\
+                   <a href=\"https://antennapod.org/deeplink/subscribe?url={}\">AntennaPod</a> | \
+                   <a href=\"https://anytimeplayer.app/subscribe?url={}\">Anytime Player</a> | \
+                   <a href=\"https://castamatic.com/guid/{}\">Castamatic</a> | \
+                   <a href=\"https://curiocaster.com/podcast/pi{}\">CurioCaster</a> | \
+                   <a href=\"https://fountain.fm/show/{}\">Fountain</a> | \
+                   <a href=\"https://gpodder.net/subscribe?url={}\">gPodder</a> | \
+                   <a href=\"https://overcast.fm/itunes{}\">Overcast</a> | \
+                   <a href=\"https://pcasts.in/feed/{}\">Pocket Casts</a> | \
+                   <a href=\"https://podcastaddict.com/feed/{}\">Podcast Addict</a> | \
+                   <a href=\"https://app.podcastguru.io/podcast/{}\">Podcast Guru</a> | \
+                   <a href=\"https://podnews.net/podcast/pi{}\">Podnews</a> | \
+                   <a href=\"https://api.podverse.fm/api/v1/podcast/podcastindex/{}\">Podverse</a> | \
                    <a href=\"https://truefans.fm/{}\">Truefans</a>\
                  </p>\
                  <p>Or <a href=\"{}\">Listen</a> right here.</p>\
-                 <p><a href=\"{}\">Comments Thread</a></p>
                 ",
                 intro_text,
                 episode.feedId,
                 episode.id,
                 episode.title,
                 episode.description,
+                episode_social_interact_display,
                 episode.feedUrl,
                 episode.feedUrl,
                 episode.podcastGuid,
@@ -2704,8 +2709,7 @@ pub fn ap_block_send_episode_note(podcast_guid: u64, episode: &PIItem, inbox_url
                 episode.feedId,
                 episode.feedId,
                 episode.podcastGuid,
-                episode.enclosureUrl,
-                episode_social_interact_uri
+                episode.enclosureUrl
             ),
             attachment: vec!(
                 NoteAttachment {
