@@ -1414,7 +1414,7 @@ pub async fn inbox(ctx: Context) -> Response {
                         }
                     }
                     if parent_pcid <= 0 {
-                        break;
+                        continue;
                     }
 
                     //##: Handle the action requests
@@ -1500,6 +1500,8 @@ pub async fn inbox(ctx: Context) -> Response {
                             println!("  Unsupported PI action request: [|{}]", parent_pcid);
                         }
                     }
+
+                    break;
                 }
             }
         }
