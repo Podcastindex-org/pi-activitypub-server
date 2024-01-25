@@ -1470,6 +1470,7 @@ pub async fn inbox(ctx: Context) -> Response {
                                                                 parent_pcid,
                                                                 latest_episode_details,
                                                                 sending_actor.inbox,
+                                                                true
                                                             );
                                                         }
                                                     }
@@ -2574,7 +2575,7 @@ pub fn ap_block_send_note(podcast_guid: u64, inbox_url: String, note: String) ->
     }
 }
 
-pub fn ap_block_send_episode_note(podcast_guid: u64, episode: &PIItem, inbox_url: String) -> Result<String, Box<dyn Error>> {
+pub fn ap_block_send_episode_note(podcast_guid: u64, episode: &PIItem, inbox_url: String, now: bool) -> Result<String, Box<dyn Error>> {
     println!("  AP Sending create episode note from actor: {}", podcast_guid);
 
     //##: Get actor keys for guid
@@ -2612,12 +2613,20 @@ pub fn ap_block_send_episode_note(podcast_guid: u64, episode: &PIItem, inbox_url
             episode.image.clone()
         }
     };
+    let mut timestamp_param = "".to_string();
+    if now {
+        timestamp_param = format!(
+            "&ts={}",
+            SystemTime::now().duration_since(UNIX_EPOCH).expect("Time mismatch.").as_secs()
+        );
+    }
     let create_action_object = Create {
         at_context: "https://www.w3.org/ns/activitystreams".to_string(),
         id: format!(
-            "https://ap.podcastindex.org/episodes?id={}&statusid={}&resource=activity",
+            "https://ap.podcastindex.org/episodes?id={}&statusid={}&resource=activity{}",
             podcast_guid,
-            episode.guid
+            episode.guid,
+            timestamp_param
         ).to_string(),
         r#type: "Create".to_string(),
         actor: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
@@ -2628,18 +2637,20 @@ pub fn ap_block_send_episode_note(podcast_guid: u64, episode: &PIItem, inbox_url
         cc: None,
         object: Object {
             id: format!(
-                "https://ap.podcastindex.org/episodes?id={}&statusid={}&resource=post",
+                "https://ap.podcastindex.org/episodes?id={}&statusid={}&resource=post{}",
                 podcast_guid,
-                episode.guid
+                episode.guid,
+                timestamp_param
             ).to_string(),
             r#type: "Note".to_string(),
             summary: None,
             inReplyTo: None,
             published: iso8601(episode.datePublished),
             url: format!(
-                "https://ap.podcastindex.org/episodes?id={}&statusid={}&resource=public",
+                "https://ap.podcastindex.org/episodes?id={}&statusid={}&resource=public{}",
                 podcast_guid,
-                episode.guid
+                episode.guid,
+                timestamp_param
             ).to_string(),
             attributedTo: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
             to: vec!(
