@@ -16,7 +16,7 @@ use rsa::{RsaPrivateKey, RsaPublicKey};
 //use rsa::pkcs1v15::{SigningKey, VerifyingKey};
 //use rsa::signature::{Keypair, RandomizedSigner, SignatureEncoding, Verifier, Signer};
 use dbif::{ActorRecord, FollowerRecord, ReplyRecord};
-//use base64::{Engine as _, engine::{general_purpose}};
+use base64::{Engine as _, engine::{general_purpose}};
 //use rand::rngs::ThreadRng;
 //use sha256::digest;
 use core::str::FromStr;
@@ -1370,7 +1370,7 @@ pub async fn inbox(ctx: Context) -> Response {
                     let _ = dbif::add_reply_to_db(&AP_DATABASE_FILE.to_string(), ReplyRecord {
                         pcid: parent_pcid.parse::<u64>().unwrap(),
                         statusid: parent_episode_guid,
-                        objectid: incoming_data.object.id,
+                        objectid: incoming_data.object.id.clone(),
                         objecttype: incoming_data.object.r#type.unwrap_or("".to_string()),
                         attributedto: incoming_data.object.attributedTo.clone().unwrap_or("".to_string()),
                         content: incoming_data.object.content.clone().unwrap(),
@@ -1389,7 +1389,7 @@ pub async fn inbox(ctx: Context) -> Response {
                         let _ = dbif::add_reply_to_db(&AP_DATABASE_FILE.to_string(), ReplyRecord {
                             pcid: reply.pcid,
                             statusid: reply.statusid,
-                            objectid: incoming_data.object.id,
+                            objectid: incoming_data.object.id.clone(),
                             objecttype: incoming_data.object.r#type.unwrap_or("".to_string()),
                             attributedto: incoming_data.object.attributedTo.clone().unwrap_or("".to_string()),
                             content: incoming_data.object.content.clone().unwrap(),
@@ -1445,6 +1445,7 @@ pub async fn inbox(ctx: Context) -> Response {
                                             parent_pcid,
                                             sending_actor.inbox,
                                             "Done.".to_string(),
+                                            Some(incoming_data.object.id.clone())
                                         );
                                     }
                                     Err(e) => {
@@ -1478,7 +1479,8 @@ pub async fn inbox(ctx: Context) -> Response {
                                                                 parent_pcid,
                                                                 latest_episode_details,
                                                                 sending_actor.inbox,
-                                                                true
+                                                                true,
+                                                                Some(incoming_data.object.id)
                                                             );
                                                         }
                                                     }
@@ -2457,7 +2459,7 @@ pub fn ap_send_follow_accept(podcast_guid: u64, inbox_accept: InboxRequestAccept
     }
 }
 
-pub fn ap_block_send_note(podcast_guid: u64, inbox_url: String, note: String) -> Result<String, Box<dyn Error>> {
+pub fn ap_block_send_note(podcast_guid: u64, inbox_url: String, note: String, in_reply_to: Option<String>) -> Result<String, Box<dyn Error>> {
     println!("  AP Sending create episode note from actor: {}", podcast_guid);
 
     //##: Get actor keys for guid
@@ -2475,7 +2477,7 @@ pub fn ap_block_send_note(podcast_guid: u64, inbox_url: String, note: String) ->
     }
 
     //##: Construct the note object to send
-    let create_action_object = Create {
+    let mut create_action_object = Create {
         at_context: "https://www.w3.org/ns/activitystreams".to_string(),
         id: format!(
             "https://ap.podcastindex.org/notes?id={}&statusid={}&resource=activity",
@@ -2519,6 +2521,12 @@ pub fn ap_block_send_note(podcast_guid: u64, inbox_url: String, note: String) ->
             attachment: vec!(),
         },
     };
+
+    //##: Is this in reply to another post
+    if in_reply_to.is_some() {
+        create_action_object.object.inReplyTo = Some(in_reply_to.unwrap());
+    }
+
     //##: Convert the note create action to JSON and send
     let create_json;
     match serde_json::to_string_pretty(&create_action_object) {
@@ -2583,7 +2591,13 @@ pub fn ap_block_send_note(podcast_guid: u64, inbox_url: String, note: String) ->
     }
 }
 
-pub fn ap_block_send_episode_note(podcast_guid: u64, episode: &PIItem, inbox_url: String, requested: bool) -> Result<String, Box<dyn Error>> {
+pub fn ap_block_send_episode_note(
+    podcast_guid: u64,
+    episode: &PIItem,
+    inbox_url: String,
+    requested: bool,
+    in_reply_to: Option<String>,
+) -> Result<String, Box<dyn Error>> {
     println!("  AP Sending create episode note from actor: {}", podcast_guid);
 
     //##: Get actor keys for guid
@@ -2624,7 +2638,7 @@ pub fn ap_block_send_episode_note(podcast_guid: u64, episode: &PIItem, inbox_url
                 episode_transcript_display = format!(
                     "<p><a href=\"https://steno.fm/show/{}/episode/{}\">Transcript</a></p>",
                     episode.podcastGuid,
-                    base64::encode(episode.guid.clone())
+                    general_purpose::STANDARD.encode(&episode.guid.clone().as_bytes())
                 );
                 break;
             }
@@ -2650,7 +2664,7 @@ pub fn ap_block_send_episode_note(podcast_guid: u64, episode: &PIItem, inbox_url
         );
         intro_text = "Latest Episode".to_string();
     }
-    let create_action_object = Create {
+    let mut create_action_object = Create {
         at_context: "https://www.w3.org/ns/activitystreams".to_string(),
         id: format!(
             "https://ap.podcastindex.org/episodes?id={}&statusid={}&resource=activity{}",
@@ -2753,6 +2767,12 @@ pub fn ap_block_send_episode_note(podcast_guid: u64, episode: &PIItem, inbox_url
             ),
         },
     };
+
+    //##: Is this in reply to another post
+    if in_reply_to.is_some() {
+        create_action_object.object.inReplyTo = Some(in_reply_to.unwrap());
+    }
+
     //##: Convert the note create action to JSON and send
     let create_json;
     match serde_json::to_string_pretty(&create_action_object) {

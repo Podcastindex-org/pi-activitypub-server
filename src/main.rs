@@ -330,7 +330,8 @@ fn episode_tracker(api_key: String, api_secret: String) {
                                                         actor.pcid,
                                                         latest_episode_details,
                                                         follower.shared_inbox.clone(),
-                                                        false
+                                                        false,
+                                                        None
                                                     );
                                                     shared_inboxes_called.push(follower.shared_inbox.clone());
                                                 }
