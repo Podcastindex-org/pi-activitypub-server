@@ -2620,11 +2620,11 @@ pub fn ap_block_send_episode_note(podcast_guid: u64, episode: &PIItem, inbox_url
     let mut episode_transcript_display = "".to_string();
     match &episode.transcripts {
         Some(transcripts) => {
-            for transcript in transcripts {
-                let episode_transcript_uri = transcript.url.clone().unwrap_or("".to_string());
+            for _transcript in transcripts {
                 episode_transcript_display = format!(
-                    "<p><a href=\"{}\">Transcript</a></p>",
-                    episode_transcript_uri
+                    "<p><a href=\"https://steno.fm/show/{}/episode/{}\">Transcript</a></p>",
+                    episode.podcastGuid,
+                    base64::encode(episode.guid.clone())
                 );
                 break;
             }
