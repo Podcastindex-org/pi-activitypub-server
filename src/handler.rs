@@ -404,6 +404,14 @@ pub struct PIItem {
     pub feedId: u64,
     pub feedItunesId: Option<u64>,
     pub socialInteract: Option<Vec<PISocialInteract>>,
+    pub transcripts: Option<Vec<PITranscript>>,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize)]
+pub struct PITranscript {
+    pub url: Option<String>,
+    pub r#type: Option<String>,
 }
 
 #[allow(non_snake_case)]
@@ -2609,6 +2617,22 @@ pub fn ap_block_send_episode_note(podcast_guid: u64, episode: &PIItem, inbox_url
             episode_social_interact_display = "".to_string();
         }
     }
+    let mut episode_transcript_display = "".to_string();
+    match &episode.transcripts {
+        Some(transcripts) => {
+            for transcript in transcripts {
+                let episode_transcript_uri = transcript.url.clone().unwrap_or("".to_string());
+                episode_transcript_display = format!(
+                    "<p><a href=\"{}\">Transcript</a></p>",
+                    episode_transcript_uri
+                );
+                break;
+            }
+        }
+        None => {
+            episode_transcript_display = "".to_string();
+        }
+    }
     let episode_image = match episode.image.as_str() {
         "" => {
             episode.feedImage.clone()
@@ -2673,9 +2697,11 @@ pub fn ap_block_send_episode_note(podcast_guid: u64, episode: &PIItem, inbox_url
                 "<p>{}: <a href=\"https://podcastindex.org/podcast/{}?episode={}\">{:.256}</a></p>\
                  <p>Shownotes:<br>{:.256}</p>\
                  {}\
+                 {}\
                  <p>\
                    <a href=\"https://antennapod.org/deeplink/subscribe?url={}\">AntennaPod</a> | \
                    <a href=\"https://anytimeplayer.app/subscribe?url={}\">Anytime Player</a> | \
+                   <a href=\"https://podcasts.apple.com/podcast/id{}\">Apple Podcasts</a> | \
                    <a href=\"https://castamatic.com/guid/{}\">Castamatic</a> | \
                    <a href=\"https://curiocaster.com/podcast/pi{}\">CurioCaster</a> | \
                    <a href=\"https://fountain.fm/show/{}\">Fountain</a> | \
@@ -2696,8 +2722,10 @@ pub fn ap_block_send_episode_note(podcast_guid: u64, episode: &PIItem, inbox_url
                 episode.title,
                 episode.description,
                 episode_social_interact_display,
+                episode_transcript_display,
                 episode.feedUrl,
                 episode.feedUrl,
+                episode.feedItunesId.unwrap_or(0),
                 episode.podcastGuid,
                 episode.feedId,
                 episode.feedId,
