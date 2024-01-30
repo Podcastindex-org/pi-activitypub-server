@@ -2192,7 +2192,7 @@ fn ap_build_actor_object(podcast_data: PIPodcast, actor_keys: ActorKeys) -> Resu
             "https://w3id.org/security/v1".to_string(),
         ),
         id: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
-        r#type: "Person".to_string(),
+        r#type: "Service".to_string(),
         discoverable: Some(true),
         preferredUsername: Some(podcast_guid.to_string()),
         name: Some(format!("{:.48}", podcast_data.feed.title).to_string()),
