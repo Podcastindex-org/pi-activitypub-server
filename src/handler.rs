@@ -1738,7 +1738,7 @@ pub async fn episodes(ctx: Context) -> Response {
             }
         }
     } else {
-        //Lookup API of podcast
+        //##: Lookup episode in the PI API
         let pi_data: PIEpisode;
         let api_response = api_get_episode(
             &ctx.pi_auth.key,
@@ -1746,6 +1746,7 @@ pub async fn episodes(ctx: Context) -> Response {
             &podcast_guid,
             &episode_guid,
         ).await;
+
         match api_response {
             Ok(response_body) => {
                 //eprintln!("{:#?}", response_body);
@@ -1764,7 +1765,7 @@ pub async fn episodes(ctx: Context) -> Response {
                             r#type: "Note".to_string(),
                             summary: None,
                             inReplyTo: None,
-                            published: pi_data.episode.datePublishedPretty,
+                            published: iso8601(pi_data.episode.datePublished.clone()),
                             url: None,
                             attributedTo: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
                             to: vec!(
