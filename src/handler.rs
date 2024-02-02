@@ -1445,7 +1445,7 @@ pub async fn inbox(ctx: Context) -> Response {
                                             parent_pcid,
                                             sending_actor.inbox,
                                             "Done.".to_string(),
-                                            Some(incoming_data.object.id.clone())
+                                            Some(incoming_data.object.id.clone()),
                                         );
                                     }
                                     Err(e) => {
@@ -1480,7 +1480,7 @@ pub async fn inbox(ctx: Context) -> Response {
                                                                 latest_episode_details,
                                                                 sending_actor.inbox,
                                                                 true,
-                                                                Some(incoming_data.object.id)
+                                                                Some(incoming_data.object.id),
                                                             );
                                                         }
                                                     }
@@ -1687,7 +1687,6 @@ pub async fn episodes(ctx: Context) -> Response {
     }
 
     //If the status id was zero, then this is the pinned post
-
     let episode_json;
     if episode_guid == "0" {
         let episode_data = Status {
@@ -1753,6 +1752,18 @@ pub async fn episodes(ctx: Context) -> Response {
                 match serde_json::from_str(response_body.as_str()) {
                     Ok(data) => {
                         pi_data = data;
+
+                        let timestamp_param = format!(
+                            "&ts={}",
+                            pi_data.episode.datePublished
+                        );
+                        let episode_object = build_episode_note_object(
+                            &pi_data.episode,
+                            podcast_guid.parse::<u64>().unwrap(),
+                            "".to_string(),
+                            timestamp_param
+                        ).unwrap();
+
                         let episode_data = Status {
                             at_context: vec!(
                                 "https://www.w3.org/ns/activitystreams".to_string(),
@@ -1783,24 +1794,8 @@ pub async fn episodes(ctx: Context) -> Response {
                                 podcast_guid,
                                 episode_guid
                             ).to_string(),
-                            content: format!(
-                                "<p>{:.256}</p><p>{:.256}</p><p>Listen: <a href=\"{}\">Listen!</a></p>",
-                                pi_data.episode.title,
-                                pi_data.episode.description,
-                                pi_data.episode.enclosureUrl,
-                            ).to_string(),
-                            attachment: Some(vec!(
-                                NoteAttachment {
-                                    r#type: Some("Document".to_string()),
-                                    mediaType: None,
-                                    url: Some(pi_data.episode.feedImage.clone()),
-                                    name: None,
-                                    blurhash: None,
-                                    width: Some(640),
-                                    height: None,
-                                    value: None,
-                                })
-                            ),
+                            content: episode_object.content,
+                            attachment: Some(episode_object.attachment),
                             actor: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
                             tag: vec!(),
                             replies: None,
@@ -2615,47 +2610,9 @@ pub fn ap_block_send_episode_note(
         }
     }
 
-    //##: Construct the episode note object to send
-    let mut episode_social_interact_display = "".to_string();
-    match &episode.socialInteract {
-        Some(social_interacts) => {
-            for social_interact in social_interacts {
-                let episode_social_interact_uri = social_interact.uri.clone().unwrap_or("".to_string());
-                episode_social_interact_display = format!(
-                    "<p><a href=\"{}\">Comments Thread</a></p>",
-                    episode_social_interact_uri
-                );
-                break;
-            }
-        }
-        None => {
-            episode_social_interact_display = "".to_string();
-        }
-    }
-    let mut episode_transcript_display = "".to_string();
-    match &episode.transcripts {
-        Some(transcripts) => {
-            for _transcript in transcripts {
-                episode_transcript_display = format!(
-                    "<p><a href=\"https://steno.fm/show/{}/episode/{}\">Transcript</a></p>",
-                    episode.podcastGuid,
-                    general_purpose::STANDARD.encode(&episode.guid.clone().as_bytes())
-                );
-                break;
-            }
-        }
-        None => {
-            episode_transcript_display = "".to_string();
-        }
-    }
-    let episode_image = match episode.image.as_str() {
-        "" => {
-            episode.feedImage.clone()
-        }
-        _ => {
-            episode.image.clone()
-        }
-    };
+    //##: If this object was built by user requesting it then it needs a timestamp parameter in it's object id so
+    //##: that it will show up as a new object in their AP timeline.  Otherwise it just comes in as an old post and
+    //##: gets sorted below the fold
     let mut intro_text = "New Episode".to_string();
     let mut timestamp_param = "".to_string();
     if requested {
@@ -2665,6 +2622,16 @@ pub fn ap_block_send_episode_note(
         );
         intro_text = "Latest Episode".to_string();
     }
+
+    //##: Build the episode object
+    let episode_object = build_episode_note_object(
+        episode,
+        podcast_guid,
+        intro_text,
+        timestamp_param.clone()
+    ).unwrap();
+
+    //##: Build the Create action that will hold the episode object
     let mut create_action_object = Create {
         at_context: "https://www.w3.org/ns/activitystreams".to_string(),
         id: format!(
@@ -2680,93 +2647,7 @@ pub fn ap_block_send_episode_note(
             "https://www.w3.org/ns/activitystreams#Public".to_string()
         ),
         cc: None,
-        object: Object {
-            id: format!(
-                "https://ap.podcastindex.org/episodes?id={}&statusid={}&resource=post{}",
-                podcast_guid,
-                episode.guid,
-                timestamp_param
-            ).to_string(),
-            r#type: "Note".to_string(),
-            summary: None,
-            inReplyTo: None,
-            published: iso8601(episode.datePublished),
-            url: format!(
-                "https://ap.podcastindex.org/episodes?id={}&statusid={}&resource=public{}",
-                podcast_guid,
-                episode.guid,
-                timestamp_param
-            ).to_string(),
-            attributedTo: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
-            to: vec!(
-                "https://www.w3.org/ns/activitystreams#Public".to_string()
-            ),
-            cc: None,
-            sensitive: false,
-            conversation: format!(
-                "tag:ap.podcastindex.org,{}:objectId={}:objectType=Conversation",
-                iso8601(episode.datePublished),
-                episode.guid
-            ).to_string(),
-            content: format!(
-                "<p>{}: <a href=\"https://podcastindex.org/podcast/{}?episode={}\">{:.256}</a></p>\
-                 <p>Shownotes:<br>{:.256}</p>\
-                 {}\
-                 {}\
-                 <p>\
-                   <a href=\"https://antennapod.org/deeplink/subscribe?url={}\">AntennaPod</a> | \
-                   <a href=\"https://anytimeplayer.app/subscribe?url={}\">Anytime Player</a> | \
-                   <a href=\"https://podcasts.apple.com/podcast/id{}\">Apple Podcasts</a> | \
-                   <a href=\"https://castamatic.com/guid/{}\">Castamatic</a> | \
-                   <a href=\"https://curiocaster.com/podcast/pi{}\">CurioCaster</a> | \
-                   <a href=\"https://fountain.fm/show/{}\">Fountain</a> | \
-                   <a href=\"https://gpodder.net/subscribe?url={}\">gPodder</a> | \
-                   <a href=\"https://overcast.fm/itunes{}\">Overcast</a> | \
-                   <a href=\"https://pcasts.in/feed/{}\">Pocket Casts</a> | \
-                   <a href=\"https://podcastaddict.com/feed/{}\">Podcast Addict</a> | \
-                   <a href=\"https://app.podcastguru.io/podcast/{}\">Podcast Guru</a> | \
-                   <a href=\"https://podnews.net/podcast/pi{}\">Podnews</a> | \
-                   <a href=\"https://api.podverse.fm/api/v1/podcast/podcastindex/{}\">Podverse</a> | \
-                   <a href=\"https://truefans.fm/{}\">Truefans</a>\
-                 </p>\
-                 <p>Or <a href=\"{}\">Listen</a> right here.</p>\
-                ",
-                intro_text,
-                episode.feedId,
-                episode.id,
-                episode.title,
-                episode.description,
-                episode_social_interact_display,
-                episode_transcript_display,
-                episode.feedUrl,
-                episode.feedUrl,
-                episode.feedItunesId.unwrap_or(0),
-                episode.podcastGuid,
-                episode.feedId,
-                episode.feedId,
-                episode.feedUrl,
-                episode.feedItunesId.unwrap_or(0),
-                episode.feedUrl,
-                episode.feedUrl,
-                episode.feedItunesId.unwrap_or(0),
-                episode.feedId,
-                episode.feedId,
-                episode.podcastGuid,
-                episode.enclosureUrl
-            ),
-            attachment: vec!(
-                NoteAttachment {
-                    r#type: Some("Document".to_string()),
-                    mediaType: None,
-                    url: Some(episode_image),
-                    name: None,
-                    blurhash: None,
-                    width: Some(640),
-                    height: None,
-                    value: None,
-                }
-            ),
-        },
+        object: episode_object,
     };
 
     //##: Is this in reply to another post
@@ -3041,6 +2922,149 @@ pub fn ap_block_get_remote_actor(actor_url: String) -> Result<Actor, Box<dyn Err
     }
 }
 
+//##: Construct an ActivityPub note object from a PI API episode object
+pub fn build_episode_note_object(
+    episode: &PIItem,
+    podcast_guid: u64,
+    intro_text: String,
+    timestamp_param: String
+) -> Result<Object, Box<dyn Error>> {
+
+    //##: If a social interact url exists, show it as a clickable link
+    let mut episode_social_interact_display = "".to_string();
+    match &episode.socialInteract {
+        Some(social_interacts) => {
+            for social_interact in social_interacts {
+                let episode_social_interact_uri = social_interact.uri.clone().unwrap_or("".to_string());
+                episode_social_interact_display = format!(
+                    "<p><a href=\"{}\">Comments Thread</a></p>",
+                    episode_social_interact_uri
+                );
+                break;
+            }
+        }
+        None => {
+            episode_social_interact_display = "".to_string();
+        }
+    }
+
+    //##: If a transcript url exists, show it as a link to a transcript viewer service
+    let mut episode_transcript_display = "".to_string();
+    match &episode.transcripts {
+        Some(transcripts) => {
+            for _transcript in transcripts {
+                episode_transcript_display = format!(
+                    "<p><a href=\"https://steno.fm/show/{}/episode/{}\">Transcript</a></p>",
+                    episode.podcastGuid,
+                    general_purpose::STANDARD.encode(&episode.guid.clone().as_bytes())
+                );
+                break;
+            }
+        }
+        None => {
+            episode_transcript_display = "".to_string();
+        }
+    }
+
+    //##: Show episode art, or feed art if no episode level art exists
+    let episode_image = match episode.image.as_str() {
+        "" => {
+            episode.feedImage.clone()
+        }
+        _ => {
+            episode.image.clone()
+        }
+    };
+
+    //##: Put it all together
+    return Ok(Object {
+        id: format!(
+            "https://ap.podcastindex.org/episodes?id={}&statusid={}&resource=post{}",
+            podcast_guid,
+            episode.guid,
+            timestamp_param
+        ).to_string(),
+        r#type: "Note".to_string(),
+        summary: None,
+        inReplyTo: None,
+        published: iso8601(episode.datePublished),
+        url: format!(
+            "https://ap.podcastindex.org/episodes?id={}&statusid={}&resource=public{}",
+            podcast_guid,
+            episode.guid,
+            timestamp_param
+        ).to_string(),
+        attributedTo: format!("https://ap.podcastindex.org/podcasts?id={}", podcast_guid).to_string(),
+        to: vec!(
+            "https://www.w3.org/ns/activitystreams#Public".to_string()
+        ),
+        cc: None,
+        sensitive: false,
+        conversation: format!(
+            "tag:ap.podcastindex.org,{}:objectId={}:objectType=Conversation",
+            iso8601(episode.datePublished),
+            episode.guid
+        ).to_string(),
+        content: format!(
+            "<p>{}: <a href=\"https://podcastindex.org/podcast/{}?episode={}\">{:.256}</a></p>\
+                 <p>Shownotes:<br>{:.256}</p>\
+                 {}\
+                 {}\
+                 <p>\
+                   <a href=\"https://antennapod.org/deeplink/subscribe?url={}\">AntennaPod</a> | \
+                   <a href=\"https://anytimeplayer.app/subscribe?url={}\">Anytime Player</a> | \
+                   <a href=\"https://podcasts.apple.com/podcast/id{}\">Apple Podcasts</a> | \
+                   <a href=\"https://castamatic.com/guid/{}\">Castamatic</a> | \
+                   <a href=\"https://curiocaster.com/podcast/pi{}\">CurioCaster</a> | \
+                   <a href=\"https://fountain.fm/show/{}\">Fountain</a> | \
+                   <a href=\"https://gpodder.net/subscribe?url={}\">gPodder</a> | \
+                   <a href=\"https://overcast.fm/itunes{}\">Overcast</a> | \
+                   <a href=\"https://pcasts.in/feed/{}\">Pocket Casts</a> | \
+                   <a href=\"https://podcastaddict.com/feed/{}\">Podcast Addict</a> | \
+                   <a href=\"https://app.podcastguru.io/podcast/{}\">Podcast Guru</a> | \
+                   <a href=\"https://podnews.net/podcast/pi{}\">Podnews</a> | \
+                   <a href=\"https://api.podverse.fm/api/v1/podcast/podcastindex/{}\">Podverse</a> | \
+                   <a href=\"https://truefans.fm/{}\">Truefans</a>\
+                 </p>\
+                 <p>Or <a href=\"{}\">Listen</a> right here.</p>\
+                ",
+            intro_text,
+            episode.feedId,
+            episode.id,
+            episode.title,
+            episode.description,
+            episode_social_interact_display,
+            episode_transcript_display,
+            episode.feedUrl,
+            episode.feedUrl,
+            episode.feedItunesId.unwrap_or(0),
+            episode.podcastGuid,
+            episode.feedId,
+            episode.feedId,
+            episode.feedUrl,
+            episode.feedItunesId.unwrap_or(0),
+            episode.feedUrl,
+            episode.feedUrl,
+            episode.feedItunesId.unwrap_or(0),
+            episode.feedId,
+            episode.feedId,
+            episode.podcastGuid,
+            episode.enclosureUrl
+        ),
+        attachment: vec!(
+            NoteAttachment {
+                r#type: Some("Document".to_string()),
+                mediaType: None,
+                url: Some(episode_image),
+                name: None,
+                blurhash: None,
+                width: Some(640),
+                height: None,
+                value: None,
+            }
+        ),
+    });
+}
 
 //Utilities --------------------------------------------------------------------------------------------------
 fn iso8601(utime: u64) -> String {
