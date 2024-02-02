@@ -1760,7 +1760,7 @@ pub async fn episodes(ctx: Context) -> Response {
                         let episode_object = build_episode_note_object(
                             &pi_data.episode,
                             podcast_guid.parse::<u64>().unwrap(),
-                            "".to_string(),
+                            "Title".to_string(),
                             timestamp_param
                         ).unwrap();
 
