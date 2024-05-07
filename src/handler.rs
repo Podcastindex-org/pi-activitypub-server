@@ -1245,7 +1245,7 @@ pub async fn inbox(ctx: Context) -> Response {
         "follow" => {
             println!("--Follow request");
             println!("  FROM: [{}]", incoming_data.actor.clone().unwrap());
-            match ap_block_get_remote_actor(incoming_data.actor.clone().unwrap()) {
+            match ap_block_get_remote_actor(podcast_guid.parse::<u64>().unwrap(), incoming_data.actor.clone().unwrap()) {
                 Ok(remote_actor) => {
                     //##: Construct a response
                     println!("  Building follow accept json.");
@@ -1439,7 +1439,7 @@ pub async fn inbox(ctx: Context) -> Response {
 
                             //##: If this request came from an actor, look them up and reply back
                             if incoming_data.object.attributedTo.clone().is_some() {
-                                match ap_block_get_remote_actor(incoming_data.object.attributedTo.clone().unwrap()) {
+                                match ap_block_get_remote_actor(parent_pcid.clone(), incoming_data.object.attributedTo.clone().unwrap()) {
                                     Ok(sending_actor) => {
                                         let _ = ap_block_send_note(
                                             parent_pcid,
@@ -1459,7 +1459,7 @@ pub async fn inbox(ctx: Context) -> Response {
                         x if x.contains("latest") => {
                             //##: If this request came from an actor, look them up and reply back
                             if incoming_data.object.attributedTo.clone().is_some() {
-                                match ap_block_get_remote_actor(incoming_data.object.attributedTo.clone().unwrap()) {
+                                match ap_block_get_remote_actor(parent_pcid.clone(), incoming_data.object.attributedTo.clone().unwrap()) {
                                     Ok(sending_actor) => {
                                         match api_block_get_episodes(
                                             &ctx.pi_auth.key,
@@ -2879,13 +2879,49 @@ pub fn ap_block_send_live_note(podcast_guid: u64, episode: &PILiveItem, inbox_ur
     }
 }
 
-pub fn ap_block_get_remote_actor(actor_url: String) -> Result<Actor, Box<dyn Error>> {
+pub fn ap_block_get_remote_actor(podcast_guid: u64, actor_url: String) -> Result<Actor, Box<dyn Error>> {
     println!("  AP Get Remote Actor: {}", actor_url);
+
+    //##: Get actor keys for guid
+    let actor_keys = ap_get_actor_keys(podcast_guid).unwrap();
+
+    //##: Decode the private key for the podcast actor
+    let private_key;
+    match crypto_rsa::rsa_private_key_from_pkcs1_pem(&actor_keys.pem_private_key) {
+        Ok(pem_decoded_privkey) => {
+            private_key = pem_decoded_privkey;
+        }
+        Err(e) => {
+            return Err(Box::new(HydraError(format!("Error decoding private key: [{}]", e).into())));
+        }
+    }
+
+    //##: Build the http signing headers
+    let key_id = format!("https://ap.podcastindex.org/podcasts?id={}#main-key", podcast_guid);
+    let http_signature_headers;
+    match http_signature::create_http_signature(
+        http::Method::GET,
+        &actor_url,
+        &"",
+        &private_key,
+        &key_id,
+    ) {
+        Ok(sig_headers) => {
+            http_signature_headers = sig_headers;
+        }
+        Err(e) => {
+            return Err(Box::new(HydraError(format!("Could not build http signature headers: [{}]", e).into())));
+        }
+    }
 
     //##: Build the query with the required headers
     let mut headers = header::HeaderMap::new();
     headers.insert("User-Agent", header::HeaderValue::from_static("Podcast Index AP/v0.1.2a"));
     headers.insert("Accept", header::HeaderValue::from_static("application/activity+json"));
+    headers.insert("date", header::HeaderValue::from_str(&http_signature_headers.date).unwrap());
+    headers.insert("host", header::HeaderValue::from_str(&http_signature_headers.host).unwrap());
+    headers.insert("digest", header::HeaderValue::from_str(&http_signature_headers.digest.unwrap()).unwrap());
+    headers.insert("signature", header::HeaderValue::from_str(&http_signature_headers.signature).unwrap());
     let client = reqwest::blocking::Client::builder()
         .default_headers(headers)
         .build()
