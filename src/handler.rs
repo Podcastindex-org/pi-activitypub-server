@@ -2902,7 +2902,7 @@ pub fn ap_block_get_remote_actor(podcast_guid: u64, actor_url: String) -> Result
     match http_signature::create_http_signature(
         http::Method::GET,
         &actor_url,
-        "{}".to_string().as_str(),
+        &"".to_string(),
         &private_key,
         &key_id,
     ) {
@@ -2914,8 +2914,8 @@ pub fn ap_block_get_remote_actor(podcast_guid: u64, actor_url: String) -> Result
         }
     }
 
-    //##: Debug
-    println!("  Sig: [{:#?}]", http_signature_headers.digest);
+    // //##: Debug
+    // println!("  Sig: [{:#?}]", http_signature_headers.digest);
 
     //##: Build the query with the required headers
     let mut headers = header::HeaderMap::new();
@@ -2923,7 +2923,7 @@ pub fn ap_block_get_remote_actor(podcast_guid: u64, actor_url: String) -> Result
     headers.insert("Accept", header::HeaderValue::from_static("application/activity+json"));
     headers.insert("date", header::HeaderValue::from_str(&http_signature_headers.date).unwrap());
     headers.insert("host", header::HeaderValue::from_str(&http_signature_headers.host).unwrap());
-    headers.insert("digest", header::HeaderValue::from_str(&http_signature_headers.digest.unwrap()).unwrap());
+    //headers.insert("digest", header::HeaderValue::from_str(&http_signature_headers.digest.unwrap()).unwrap());
     headers.insert("signature", header::HeaderValue::from_str(&http_signature_headers.signature).unwrap());
     let client = reqwest::blocking::Client::builder()
         .default_headers(headers)
