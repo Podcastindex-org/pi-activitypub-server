@@ -2902,7 +2902,7 @@ pub fn ap_block_get_remote_actor(podcast_guid: u64, actor_url: String) -> Result
     match http_signature::create_http_signature(
         http::Method::GET,
         &actor_url,
-        &"",
+        "".to_string().as_str(),
         &private_key,
         &key_id,
     ) {
