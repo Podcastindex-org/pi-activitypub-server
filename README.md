@@ -35,4 +35,5 @@ Outside contributions are very welcome.
 
 ## Version history
 
+v0.0.6 - Added support for authorized_fetch instances
 v0.0.5 - Initial stages of reply handling.
