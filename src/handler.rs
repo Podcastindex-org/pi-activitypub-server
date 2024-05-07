@@ -2902,7 +2902,7 @@ pub fn ap_block_get_remote_actor(podcast_guid: u64, actor_url: String) -> Result
     match http_signature::create_http_signature(
         http::Method::GET,
         &actor_url,
-        "".to_string().as_str(),
+        "{}".to_string().as_str(),
         &private_key,
         &key_id,
     ) {
@@ -2913,6 +2913,9 @@ pub fn ap_block_get_remote_actor(podcast_guid: u64, actor_url: String) -> Result
             return Err(Box::new(HydraError(format!("Could not build http signature headers: [{}]", e).into())));
         }
     }
+
+    //##: Debug
+    println!("  Sig: [{:#?}]", http_signature_headers.digest);
 
     //##: Build the query with the required headers
     let mut headers = header::HeaderMap::new();
