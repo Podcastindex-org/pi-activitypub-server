@@ -6,7 +6,7 @@ use hyper::server::conn::AddrStream;
 use std::env;
 use std::string::ToString;
 use std::thread;
-use std::time::{Duration};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use crate::handler::{
     api_block_get_episodes,
@@ -277,6 +277,8 @@ fn episode_tracker(api_key: String, api_secret: String) {
     loop {
         thread::sleep(Duration::from_millis(LOOP_TIMER_MILLISECONDS));
 
+        let start_time = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time mismatch.").as_secs();
+
         println!("TRACKER: Polling podcast data.");
 
         let actors;
@@ -363,6 +365,7 @@ fn episode_tracker(api_key: String, api_secret: String) {
             thread::sleep(Duration::from_millis(500));
         }
 
+        println!("TRACKER RUN: [{}] seconds.", SystemTime::now().duration_since(UNIX_EPOCH).expect("Time mismatch.").as_secs() - start_time);
         println!("TRACKER: [{}] podcasts being followed.", actor_count);
     }
 }
