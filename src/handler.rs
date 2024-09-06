@@ -1,4 +1,4 @@
-use crate::{Context, crypto_rsa, http_signature, Response};
+use crate::{Context, crypto_rsa, http_signature, Response, USER_AGENT_PARAM};
 use hyper::StatusCode;
 use std::collections::HashMap;
 use std::error::Error;
@@ -1911,7 +1911,7 @@ pub async fn api_get_podcast(key: &str, secret: &str, query: &str) -> Result<Str
 
     //##: Build the query with the required headers
     let mut headers = header::HeaderMap::new();
-    headers.insert("User-Agent", header::HeaderValue::from_static("Rust-podcastindex-org-example/v1.0"));
+    headers.insert("User-Agent", header::HeaderValue::from_static(USER_AGENT_PARAM));
     headers.insert("X-Auth-Date", header::HeaderValue::from_str(api_time.as_str()).unwrap());
     headers.insert("X-Auth-Key", header::HeaderValue::from_str(api_key).unwrap());
     headers.insert("Authorization", header::HeaderValue::from_str(api_hash.as_str()).unwrap());
@@ -1959,7 +1959,7 @@ pub async fn api_hub_rescan(key: &str, secret: &str, query: &str) -> Result<Stri
 
     //##: Build the query with the required headers
     let mut headers = header::HeaderMap::new();
-    headers.insert("User-Agent", header::HeaderValue::from_static("Rust-podcastindex-org-example/v1.0"));
+    headers.insert("User-Agent", header::HeaderValue::from_static(USER_AGENT_PARAM));
     headers.insert("X-Auth-Date", header::HeaderValue::from_str(api_time.as_str()).unwrap());
     headers.insert("X-Auth-Key", header::HeaderValue::from_str(api_key).unwrap());
     headers.insert("Authorization", header::HeaderValue::from_str(api_hash.as_str()).unwrap());
@@ -2007,7 +2007,7 @@ pub async fn api_get_episodes(key: &str, secret: &str, query: &str) -> Result<St
 
     //##: Build the query with the required headers
     let mut headers = header::HeaderMap::new();
-    headers.insert("User-Agent", header::HeaderValue::from_static("Rust-podcastindex-org-example/v1.0"));
+    headers.insert("User-Agent", header::HeaderValue::from_static(USER_AGENT_PARAM));
     headers.insert("X-Auth-Date", header::HeaderValue::from_str(api_time.as_str()).unwrap());
     headers.insert("X-Auth-Key", header::HeaderValue::from_str(api_key).unwrap());
     headers.insert("Authorization", header::HeaderValue::from_str(api_hash.as_str()).unwrap());
@@ -2061,7 +2061,7 @@ pub async fn api_get_episode(key: &str, secret: &str, query: &str, guid: &str) -
 
     //##: Build the query with the required headers
     let mut headers = header::HeaderMap::new();
-    headers.insert("User-Agent", header::HeaderValue::from_static("Rust-podcastindex-org-example/v1.0"));
+    headers.insert("User-Agent", header::HeaderValue::from_static(USER_AGENT_PARAM));
     headers.insert("X-Auth-Date", header::HeaderValue::from_str(api_time.as_str()).unwrap());
     headers.insert("X-Auth-Key", header::HeaderValue::from_str(api_key).unwrap());
     headers.insert("Authorization", header::HeaderValue::from_str(api_hash.as_str()).unwrap());
@@ -2109,7 +2109,7 @@ pub fn api_block_get_episodes(key: &str, secret: &str, query: &str) -> Result<St
 
     //##: Build the query with the required headers
     let mut headers = header::HeaderMap::new();
-    headers.insert("User-Agent", header::HeaderValue::from_static("Rust-podcastindex-org-example/v1.0"));
+    headers.insert("User-Agent", header::HeaderValue::from_static(USER_AGENT_PARAM));
     headers.insert("X-Auth-Date", header::HeaderValue::from_str(api_time.as_str()).unwrap());
     headers.insert("X-Auth-Key", header::HeaderValue::from_str(api_key).unwrap());
     headers.insert("Authorization", header::HeaderValue::from_str(api_hash.as_str()).unwrap());
@@ -2157,7 +2157,7 @@ pub fn api_block_get_live_items(key: &str, secret: &str, query: &str) -> Result<
 
     //##: Build the query with the required headers
     let mut headers = header::HeaderMap::new();
-    headers.insert("User-Agent", header::HeaderValue::from_static("Rust-podcastindex-org-example/v1.0"));
+    headers.insert("User-Agent", header::HeaderValue::from_static(USER_AGENT_PARAM));
     headers.insert("X-Auth-Date", header::HeaderValue::from_str(api_time.as_str()).unwrap());
     headers.insert("X-Auth-Key", header::HeaderValue::from_str(api_key).unwrap());
     headers.insert("Authorization", header::HeaderValue::from_str(api_hash.as_str()).unwrap());
