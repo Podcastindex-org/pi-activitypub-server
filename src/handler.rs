@@ -1238,8 +1238,8 @@ pub async fn inbox(ctx: Context) -> Response {
     //##: Handle the request based on its type
     match incoming_data.r#type.to_lowercase().as_str() {
         "delete" => {
-            println!("--Delete request: {:#?}", incoming_data);
-            println!("  BODY: {}", body);
+            //println!("--Delete request: {:#?}", incoming_data);
+            //println!("  BODY: {}", body);
         }
 
         "follow" => {

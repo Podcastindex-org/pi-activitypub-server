@@ -304,7 +304,7 @@ fn episode_tracker(api_key: String, api_secret: String) {
                     }
 
                     //##: Lookup API of podcast
-                    //println!("  Podcast - [{}]", actor.pcid);
+                    println!("  Podcast API Call - [{}]", actor.pcid);
                     match api_block_get_episodes(
                         &api_key,
                         &api_secret,
@@ -319,10 +319,6 @@ fn episode_tracker(api_key: String, api_secret: String) {
                                     if latest_episode.is_some() {
                                         let latest_episode_details = latest_episode.unwrap();
                                         if actor.last_episode_guid != latest_episode_details.guid {
-                                            //##: Loop through the followers of this podcast and send updates if there are any
-
-
-                                            //##: TODO, this needs to be a single shared_inbox call instead of per follower
                                             let mut shared_inboxes_called = Vec::new();
                                             for follower in followers {
                                                 if !shared_inboxes_called.contains(&follower.shared_inbox) {
@@ -364,7 +360,7 @@ fn episode_tracker(api_key: String, api_secret: String) {
                 }
             }
 
-            thread::sleep(Duration::from_millis(1000));
+            thread::sleep(Duration::from_millis(500));
         }
 
         println!("TRACKER: [{}] podcasts being followed.", actor_count);
