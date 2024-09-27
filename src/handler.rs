@@ -92,6 +92,7 @@ pub struct NoteAttachment {
     blurhash: Option<String>,
     width: Option<u64>,
     height: Option<u64>,
+    description: Option<String>,
 }
 
 #[allow(non_snake_case)]
@@ -2811,6 +2812,7 @@ pub fn ap_block_send_live_note(podcast_guid: u64, episode: &PILiveItem, inbox_ur
                     width: Some(640),
                     height: None,
                     value: None,
+                    description: Some("Show's artwork from the channel feed".to_string()),
                 }
             ),
         },
@@ -3100,6 +3102,7 @@ pub fn build_episode_note_object(
                 width: Some(640),
                 height: None,
                 value: None,
+                description: Some(format!("Episode artwork for {}", episode.title).to_string()),
             }
         ),
     });
