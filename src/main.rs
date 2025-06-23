@@ -150,7 +150,7 @@ async fn main() {
             }
         }
     });
-
+    
     let env_live_pi_api_key = env_pi_api_key.clone();
     let env_live_pi_api_secret = env_pi_api_secret.clone();
     thread::spawn(move || {
@@ -371,84 +371,106 @@ fn episode_tracker(api_key: String, api_secret: String) {
 }
 
 fn live_item_tracker(api_key: String, api_secret: String) {
-
-    println!("PODPING: Connected to podping socket.");
-
-    //##: TODO - reconnect socket if it falls down
-    let (mut socket, _response) = connect(
-        Url::parse(format!("wss://api.livewire.io/ws/podping?agent={}", USER_AGENT_PARAM).as_str()).unwrap()
-    ).expect("Can't connect to podping socket.");
-
     loop {
-        #[allow(deprecated)]
-        let msg = socket.read_message().expect("Error reading message");
-        //println!(" Podping Received: {:#?}", msg.to_text().unwrap());
-        match serde_json::from_str(msg.to_text().unwrap()) {
-            Ok(data) => {
-                let socket_payload: SocketPayload = data;
-                // println!("PODPING: [{:#?}]", socket_payload);
-                for podping in socket_payload.p {
-                    if podping.p.reason == "live" {
-                        println!("*****LIVE PODPING: [{:#?}]", podping);
-                        let first_iri = podping.p.iris.get(0);
-                        if first_iri.is_none() {
-                            continue;
-                        }
-                        //##: Sleep to let the index catch up
-                        thread::sleep(Duration::from_millis(LOOP_TIMER_MILLISECONDS));
-                        match api_block_get_live_items(
-                            &api_key,
-                            &api_secret,
-                            first_iri.unwrap()
-                        ) {
-                            Ok(api_response) => {
-                                match serde_json::from_str(api_response.as_str()) {
-                                    Ok(response_data) => {
-                                        let live_item_data: PILiveItems = response_data;
-                                        for live_item in live_item_data.liveItems {
-                                            if live_item.status == "live" {
-                                                println!("*****PODPING LIVE - {} {}",
-                                                         live_item.feedId,
-                                                         live_item.status
-                                                );
-                                                match dbif::get_followers_from_db(&AP_DATABASE_FILE.to_string(), live_item.feedId) {
-                                                    Ok(followers) => {
-                                                        let mut shared_inboxes_called = Vec::new();
-                                                        for follower in followers {
-                                                            if !shared_inboxes_called.contains(&follower.shared_inbox) {
-                                                                let _ = ap_block_send_live_note(
-                                                                    live_item.feedId,
-                                                                    &live_item,
-                                                                    follower.shared_inbox.clone(),
-                                                                );
-                                                                shared_inboxes_called.push(follower.shared_inbox.clone());
-                                                            }
-                                                        }
-                                                    }
-                                                    Err(_e) => {
-                                                        //##: TODO - refactor this deep nesting
-                                                    }
-                                                }
-                                                break;
-                                            }
-                                        }
-                                    }
-                                    Err(_e) => {
-                                        //##: TODO - refactor this deep nesting
-                                    }
-                                }
-                            }
-                            Err(_e) => {
-                                //##: TODO - refactor this deep nesting
-                            }
-                        }
+        println!("PODPING: Connecting to podping socket.");
+        let socket_result = connect(
+            Url::parse(format!("wss://api.livewire.io/ws/podping?agent={}", USER_AGENT_PARAM).as_str())
+                .unwrap(),
+        );
 
-                    }
-                }
+        let (mut socket, _response) = match socket_result {
+            Ok(conn) => {
+                println!("PODPING: Connected to podping socket.");
+                conn
             }
             Err(e) => {
-                eprintln!("PODPING PARSE ERR: [{:#?}]", e);
+                eprintln!("PODPING: Failed to connect to podping socket: [{:#?}]", e);
+                // Wait before retrying the connection
+                thread::sleep(Duration::from_secs(5));
+                continue;
+            }
+        };
+
+        // Main read loop
+        loop {
+            let msg = match socket.read_message() {
+                Ok(msg) => msg,
+                Err(e) => {
+                    eprintln!("PODPING: Socket disconnected or error reading message: [{:#?}]", e);
+                    // Sleep a bit and break to outer loop to reconnect
+                    thread::sleep(Duration::from_secs(5));
+                    break;
+                }
+            };
+
+            match serde_json::from_str(msg.to_text().unwrap()) {
+                Ok(data) => {
+                    let socket_payload: SocketPayload = data;
+                    for podping in socket_payload.p {
+                        if podping.p.reason == "live" {
+                            println!("*****LIVE PODPING: [{:#?}]", podping);
+                            let first_iri = podping.p.iris.get(0);
+                            if first_iri.is_none() {
+                                continue;
+                            }
+                            //##: Sleep to let the index catch up
+                            thread::sleep(Duration::from_millis(LOOP_TIMER_MILLISECONDS));
+                            match api_block_get_live_items(
+                                &api_key,
+                                &api_secret,
+                                first_iri.unwrap()
+                            ) {
+                                Ok(api_response) => {
+                                    match serde_json::from_str(api_response.as_str()) {
+                                        Ok(response_data) => {
+                                            let live_item_data: PILiveItems = response_data;
+                                            for live_item in live_item_data.liveItems {
+                                                if live_item.status == "live" {
+                                                    println!("*****PODPING LIVE - {} {}",
+                                                             live_item.feedId,
+                                                             live_item.status
+                                                    );
+                                                    match dbif::get_followers_from_db(&AP_DATABASE_FILE.to_string(), live_item.feedId) {
+                                                        Ok(followers) => {
+                                                            let mut shared_inboxes_called = Vec::new();
+                                                            for follower in followers {
+                                                                if !shared_inboxes_called.contains(&follower.shared_inbox) {
+                                                                    let _ = ap_block_send_live_note(
+                                                                        live_item.feedId,
+                                                                        &live_item,
+                                                                        follower.shared_inbox.clone(),
+                                                                    );
+                                                                    shared_inboxes_called.push(follower.shared_inbox.clone());
+                                                                }
+                                                            }
+                                                        }
+                                                        Err(_e) => {
+                                                            //##: TODO - refactor this deep nesting
+                                                        }
+                                                    }
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        Err(_e) => {
+                                            //##: TODO - refactor this deep nesting
+                                        }
+                                    }
+                                }
+                                Err(_e) => {
+                                    //##: TODO - refactor this deep nesting
+                                }
+                            }
+
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("PODPING PARSE ERR: [{:#?}]", e);
+                }
             }
         }
+        // When we reach here, the inner loop has broken, so we'll reconnect
+        println!("PODPING: Attempting to reconnect to socket...");
     }
 }
